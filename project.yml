@@ -31,6 +31,7 @@ targets:
     platform: iOS
     sources:
       - path: App/Sources
+      - path: App/Shared
     dependencies:
       - package: PRVBeauty
         products:
@@ -92,6 +93,7 @@ targets:
     platform: iOS
     sources:
       - path: App/Widgets
+      - path: App/Shared
     dependencies:
       - package: PRVBeauty
         products: [PRVFoundation, PRVModels, PRVDesignSystem]
