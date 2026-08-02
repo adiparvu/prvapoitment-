@@ -22,6 +22,7 @@ struct PRVBeautyApp: App {
                 .environment(router)
                 .environment(\.prvDependencies, dependencies)
                 .task { await restoreSession() }
+                .prvWidgetSync(session: session, dependencies: dependencies)
                 .onOpenURL { url in
                     let experience: DeepLinkHandler.Experience =
                         session.isBusinessExperience ? .business : .client

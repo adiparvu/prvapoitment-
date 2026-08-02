@@ -119,7 +119,15 @@ public struct PurchaseOrder: Codable, Hashable, Sendable, Identifiable {
         self.expectedAt = expectedAt
     }
 
+    /// Total cost of the order, denominated in the lines' own currency.
+    ///
+    /// Seeded from the first line rather than a hard-coded euro zero, so a
+    /// supplier invoiced in another currency sums correctly instead of
+    /// mixing currencies.
     public var totalCost: Money {
-        lines.reduce(.zero()) { $0 + ($1.unitCost * Decimal($1.quantity)) }
+        guard let first = lines.first else { return .zero() }
+        return lines.dropFirst().reduce(first.unitCost * Decimal(first.quantity)) {
+            $0 + ($1.unitCost * Decimal($1.quantity))
+        }
     }
 }

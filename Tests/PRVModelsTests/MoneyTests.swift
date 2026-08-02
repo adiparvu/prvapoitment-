@@ -83,4 +83,50 @@ struct MoneyTests {
         #expect(decoded.amount == Decimal(string: "185.50"))
         #expect(decoded.currency == .eur)
     }
+
+    // MARK: - Zero is currency-agnostic
+
+    // Nothing is nothing in every currency. Neutral zeros therefore adopt the
+    // other operand's denomination, which is what keeps `reduce(.zero())`
+    // seeds and defaulted zero fields from mixing currencies on a non-euro
+    // order — the crash this behaviour was introduced to remove.
+
+    @Test("A zero seed adopts the currency of what is added to it")
+    func zeroSeedAdoptsTheOtherCurrency() {
+        let sum = Money.zero() + Money(50, .usd)
+
+        #expect(sum.amount == 50)
+        #expect(sum.currency == .usd)
+    }
+
+    @Test("Subtracting a defaulted euro zero leaves the amount's own currency")
+    func subtractingZeroKeepsTheReceiverCurrency() {
+        let remaining = Money(120, .gbp) - Money.zero()
+
+        #expect(remaining.amount == 120)
+        #expect(remaining.currency == .gbp)
+    }
+
+    @Test("When both sides are zero the left operand's currency wins")
+    func zeroMinusZeroKeepsTheLeftCurrency() {
+        #expect((Money.zero(.usd) - Money.zero(.eur)).currency == .usd)
+        #expect((Money.zero(.usd) + Money.zero(.eur)).currency == .usd)
+    }
+
+    @Test("Summing a foreign-currency collection from a zero seed stays in that currency")
+    func reduceFromZeroSeedStaysForeign() {
+        let amounts = [Money(10, .chf), Money(20, .chf), Money(5, .chf)]
+
+        let total = amounts.reduce(Money.zero()) { $0 + $1 }
+
+        #expect(total.amount == 35)
+        #expect(total.currency == .chf)
+    }
+
+    @Test("Zero compares against any currency")
+    func zeroComparesAcrossCurrencies() {
+        #expect(Money.zero() < Money(1, .usd))
+        #expect(Money(1, .usd) > Money.zero())
+        #expect(!(Money.zero(.usd) < Money.zero(.eur)))
+    }
 }

@@ -11,6 +11,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  domain:
+    name: Domain logic (Linux)
+    runs-on: ubuntu-24.04
+    container: swift:6.0.3
+    steps:
+      - uses: actions/checkout@v4
+
+      # The models and domain kits are pure Foundation, so booking, pricing,
+      # and loyalty logic is verified here in seconds — no simulator needed.
+      - name: Build & test domain layer
+        run: Scripts/linux-domain-tests.sh
+
   package:
     name: Build & test Swift package
     runs-on: macos-15

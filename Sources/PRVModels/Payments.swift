@@ -146,10 +146,10 @@ public struct Order: Codable, Hashable, Sendable, Identifiable {
         appointmentID: Appointment.ID? = nil,
         lines: [OrderLine] = [],
         status: OrderStatus = .draft,
-        discount: Money = .zero(),
+        discount: Money? = nil,
         discountReason: String? = nil,
         vatPercent: Decimal = 21,
-        amountPaid: Money = .zero(),
+        amountPaid: Money? = nil,
         pointsEarned: Int = 0,
         currency: Currency = .eur,
         createdAt: Date = .now,
@@ -161,10 +161,13 @@ public struct Order: Codable, Hashable, Sendable, Identifiable {
         self.appointmentID = appointmentID
         self.lines = lines
         self.status = status
-        self.discount = discount
+        // Defaulted to the order's own currency, never a hard-coded euro:
+        // `subtotal - discount` would otherwise mix currencies on any
+        // non-EUR order and trap.
+        self.discount = discount ?? .zero(currency)
         self.discountReason = discountReason
         self.vatPercent = vatPercent
-        self.amountPaid = amountPaid
+        self.amountPaid = amountPaid ?? .zero(currency)
         self.pointsEarned = pointsEarned
         self.currency = currency
         self.createdAt = createdAt
