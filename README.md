@@ -45,10 +45,18 @@ screen, flow, and preview works with zero configuration.
 ### Running the tests
 
 ```bash
+# Domain logic — no Xcode or simulator needed, runs in seconds on Linux or macOS.
+# Covers the models, booking/pricing/loyalty engines, repository contracts,
+# and the in-memory backend.
+Scripts/linux-domain-tests.sh
+
+# Everything, including the UI modules:
 xcodebuild test -scheme PRVBeauty -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
-# or, package-only:
-swift test
 ```
+
+The domain layer is deliberately pure Foundation (see
+[`ARCHITECTURE.md`](ARCHITECTURE.md) §3 — kits contain zero SwiftUI), which is what
+lets the rules that move money and time be verified without an Apple SDK.
 
 ### Backend
 
