@@ -73,7 +73,7 @@ PRVDesignSystem        ← PRVFoundation
 PRVNetworking          ← PRVFoundation, PRVModels
 PRVPersistence         ← PRVFoundation, PRVModels
 PRV*Kit                ← PRVFoundation, PRVModels          (pure domain logic, no UI)
-PRV*Feature            ← PRVDesignSystem, PRVModels, PRVNetworking (+ relevant Kits)
+PRV*Feature            ← PRVFoundation, PRVDesignSystem, PRVModels, PRVNetworking (+ relevant Kits)
 App target             ← all features
 ```
 

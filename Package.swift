@@ -74,43 +74,43 @@ let package = Package(
 
         // ── Features ────────────────────────────────────────────────────────
         target("PRVAuthFeature", dependencies: [
-            "PRVDesignSystem", "PRVModels", "PRVNetworking",
+            "PRVFoundation", "PRVDesignSystem", "PRVModels", "PRVNetworking",
         ]),
         target("PRVHomeFeature", dependencies: [
-            "PRVDesignSystem", "PRVModels", "PRVNetworking", "PRVLoyaltyKit",
+            "PRVFoundation", "PRVDesignSystem", "PRVModels", "PRVNetworking", "PRVLoyaltyKit",
         ]),
         target("PRVDiscoverFeature", dependencies: [
-            "PRVDesignSystem", "PRVModels", "PRVNetworking",
+            "PRVFoundation", "PRVDesignSystem", "PRVModels", "PRVNetworking",
         ]),
         target("PRVSalonProfileFeature", dependencies: [
-            "PRVDesignSystem", "PRVModels", "PRVNetworking",
+            "PRVFoundation", "PRVDesignSystem", "PRVModels", "PRVNetworking",
         ]),
         target("PRVBookingFeature", dependencies: [
-            "PRVDesignSystem", "PRVModels", "PRVNetworking", "PRVBookingKit", "PRVPaymentsKit",
+            "PRVFoundation", "PRVDesignSystem", "PRVModels", "PRVNetworking", "PRVBookingKit", "PRVPaymentsKit",
         ]),
         target("PRVPaymentsFeature", dependencies: [
-            "PRVDesignSystem", "PRVModels", "PRVNetworking", "PRVPaymentsKit",
+            "PRVFoundation", "PRVDesignSystem", "PRVModels", "PRVNetworking", "PRVPaymentsKit",
         ]),
         target("PRVWalletFeature", dependencies: [
-            "PRVDesignSystem", "PRVModels", "PRVNetworking", "PRVPaymentsKit", "PRVLoyaltyKit",
+            "PRVFoundation", "PRVDesignSystem", "PRVModels", "PRVNetworking", "PRVPaymentsKit", "PRVLoyaltyKit",
         ]),
         target("PRVMembershipsFeature", dependencies: [
-            "PRVDesignSystem", "PRVModels", "PRVNetworking", "PRVPaymentsKit",
+            "PRVFoundation", "PRVDesignSystem", "PRVModels", "PRVNetworking", "PRVPaymentsKit",
         ]),
         target("PRVChatFeature", dependencies: [
-            "PRVDesignSystem", "PRVModels", "PRVNetworking",
+            "PRVFoundation", "PRVDesignSystem", "PRVModels", "PRVNetworking",
         ]),
         target("PRVNotificationsFeature", dependencies: [
-            "PRVDesignSystem", "PRVModels", "PRVNetworking",
+            "PRVFoundation", "PRVDesignSystem", "PRVModels", "PRVNetworking",
         ]),
         target("PRVDashboardFeature", dependencies: [
-            "PRVDesignSystem", "PRVModels", "PRVNetworking",
+            "PRVFoundation", "PRVDesignSystem", "PRVModels", "PRVNetworking",
         ]),
         target("PRVCRMFeature", dependencies: [
-            "PRVDesignSystem", "PRVModels", "PRVNetworking",
+            "PRVFoundation", "PRVDesignSystem", "PRVModels", "PRVNetworking",
         ]),
         target("PRVOperationsFeature", dependencies: [
-            "PRVDesignSystem", "PRVModels", "PRVNetworking",
+            "PRVFoundation", "PRVDesignSystem", "PRVModels", "PRVNetworking",
         ]),
 
         // ── Tests ───────────────────────────────────────────────────────────
