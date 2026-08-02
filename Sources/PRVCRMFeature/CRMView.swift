@@ -167,15 +167,19 @@ public struct CRMView: View {
     private var statsRow: some View {
         LazyVGrid(columns: statColumns, spacing: PRVSpacing.sm) {
             PRVStatTile(label: "Clients", value: "\(model.clients.count)")
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(model.clients.count) clients in the book")
 
             PRVStatTile(label: "New this month", value: "\(model.newThisMonth)")
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(model.newThisMonth) clients added in the last 30 days")
 
             PRVStatTile(label: "Lifetime spend", value: model.totalSpend.formatted)
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Lifetime spend across the book, \(model.totalSpend.formatted)")
 
             PRVStatTile(label: "Lapsed 90d+", value: "\(model.lapsedCount)")
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(model.lapsedCount) clients have not visited in over 90 days")
         }
     }

@@ -20,23 +20,66 @@ import PRVOperationsFeature
 /// experience with a floating Liquid Glass tab bar.
 struct RootView: View {
     @Environment(UserSession.self) private var session
+    @Environment(AppRouter.self) private var router
 
     let hasRestoredSession: Bool
+
+    /// Set when a visitor chooses "Continue as Guest": the auth surface steps
+    /// aside and the browse-only client experience takes over until they sign
+    /// in. Signing in or out re-arms the gate.
+    @State private var isBrowsingAsGuest = false
 
     var body: some View {
         Group {
             if !hasRestoredSession {
                 LaunchView()
-            } else if !session.isAuthenticated {
-                AuthRootView()
             } else if session.isBusinessExperience {
                 BusinessExperienceView()
             } else {
-                ClientExperienceView()
+                // The client experience hosts the gate as a cover so
+                // `AuthRootView`'s `dismiss()` — how it hands control back
+                // after the guest sheet — resolves to a real presentation and
+                // reveals the browse-only experience underneath.
+                ClientExperienceView(
+                    endGuestBrowsing: isBrowsingAsGuest ? { isBrowsingAsGuest = false } : nil
+                )
+                .fullScreenCover(isPresented: isPresentingAuth) {
+                    AuthRootView()
+                }
             }
         }
         .animation(PRVMotion.gentle, value: session.isAuthenticated)
         .animation(PRVMotion.gentle, value: session.isBusinessExperience)
+        .onChange(of: session.isAuthenticated) { _, _ in
+            isBrowsingAsGuest = false
+        }
+        .onChange(of: session.isBusinessExperience, initial: true) { _, isBusiness in
+            normalizeSelectedTab(isBusinessExperience: isBusiness)
+        }
+    }
+
+    /// Presents the welcome surface until the visitor either signs in or
+    /// explicitly chooses to browse as a guest. Dismissal is the guest path,
+    /// so it records the choice instead of re-presenting immediately.
+    private var isPresentingAuth: Binding<Bool> {
+        Binding(
+            get: { hasRestoredSession && !session.isAuthenticated && !isBrowsingAsGuest },
+            set: { isPresented in
+                guard !isPresented else { return }
+                isBrowsingAsGuest = true
+            }
+        )
+    }
+
+    /// Keeps `AppRouter.selectedTab` inside the tab set the active experience
+    /// renders. The router defaults to `.home`, which is absent from
+    /// `AppTab.businessTabs`, so a salon user would otherwise land on a
+    /// selection that matches no `Tab` — and push routes onto a navigation
+    /// path nothing builds.
+    private func normalizeSelectedTab(isBusinessExperience: Bool) {
+        let tabs = isBusinessExperience ? AppTab.businessTabs : AppTab.clientTabs
+        guard !tabs.contains(router.selectedTab) else { return }
+        router.selectedTab = isBusinessExperience ? .dashboard : .home
     }
 }
 
@@ -58,8 +101,7 @@ private struct ClientExperienceView: View {
     @Environment(AppRouter.self) private var router
 
     var body: some View {
-        @Bindable var router = router
-        TabView(selection: $router.selectedTab) {
+        TabView(selection: tabSelection) {
             ForEach(AppTab.clientTabs, id: \.self) { tab in
                 Tab(tab.title, systemImage: tab.symbolName, value: tab) {
                     NavigationStack(path: pathBinding(for: tab)) {
@@ -90,6 +132,15 @@ private struct ClientExperienceView: View {
         }
     }
 
+    /// Reads through a clamp so the selection always matches a rendered `Tab`,
+    /// even for a value left behind by the business experience.
+    private var tabSelection: Binding<AppTab> {
+        Binding(
+            get: { AppTab.clientTabs.contains(router.selectedTab) ? router.selectedTab : .home },
+            set: { router.selectedTab = $0 }
+        )
+    }
+
     private func pathBinding(for tab: AppTab) -> Binding<[AppRoute]> {
         Binding(
             get: { router.paths[tab] ?? [] },
@@ -111,8 +162,7 @@ private struct BusinessExperienceView: View {
     @Environment(AppRouter.self) private var router
 
     var body: some View {
-        @Bindable var router = router
-        TabView(selection: $router.selectedTab) {
+        TabView(selection: tabSelection) {
             ForEach(AppTab.businessTabs, id: \.self) { tab in
                 Tab(tab.title, systemImage: tab.symbolName, value: tab) {
                     NavigationStack(path: pathBinding(for: tab)) {
@@ -135,12 +185,23 @@ private struct BusinessExperienceView: View {
     private func businessRoot(for tab: AppTab) -> some View {
         switch tab {
         case .dashboard: SalonDashboardView()
-        case .calendar: AppointmentsListView()
+        // The salon's own day book — `AppointmentsListView` is client-scoped
+        // and would show the signed-in owner's personal bookings here.
+        case .calendar: SalonScheduleView()
         case .clients: CRMView()
         case .chat: ChatListView()
         case .operations: TeamView()
         default: SalonDashboardView()
         }
+    }
+
+    /// Reads through a clamp so the selection always matches a rendered `Tab`,
+    /// even before the router has been normalized for this experience.
+    private var tabSelection: Binding<AppTab> {
+        Binding(
+            get: { AppTab.businessTabs.contains(router.selectedTab) ? router.selectedTab : .dashboard },
+            set: { router.selectedTab = $0 }
+        )
     }
 
     private func pathBinding(for tab: AppTab) -> Binding<[AppRoute]> {
@@ -180,8 +241,8 @@ struct RouteDestinationView: View {
             SalonProfileView(salonID: salonID)
         case .booking(let salonID, let serviceIDs):
             BookingFlowView(context: BookingContext(salonID: salonID, serviceIDs: serviceIDs))
-        case .appointment:
-            AppointmentsListView()
+        case .appointment(let id):
+            AppointmentDetailView(appointmentID: id)
         case .checkout(let orderID):
             CheckoutView(order: orderID)
         case .conversation(let id):
@@ -212,7 +273,10 @@ struct RouteDestinationView: View {
 
 /// Settings lives in the app target until it grows into its own module.
 struct SettingsPlaceholderView: View {
+    @Environment(\.prvDependencies) private var deps
     @Environment(UserSession.self) private var session
+
+    @State private var isSigningOut = false
 
     var body: some View {
         List {
@@ -236,10 +300,24 @@ struct SettingsPlaceholderView: View {
             }
             Section {
                 Button("Sign Out", role: .destructive) {
-                    session.signedOut()
+                    signOut()
                 }
+                .disabled(isSigningOut)
             }
         }
         .navigationTitle("Settings")
+    }
+
+    /// Ends the session on the backend first — that is what drops the
+    /// persisted, Keychain-backed token — then clears the in-memory session so
+    /// the shell returns to the welcome screen.
+    private func signOut() {
+        guard !isSigningOut else { return }
+        isSigningOut = true
+        Task {
+            await deps.auth.signOut()
+            session.signedOut()
+            isSigningOut = false
+        }
     }
 }

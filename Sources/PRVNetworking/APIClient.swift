@@ -61,19 +61,32 @@ extension APIClient {
     }
 }
 
-/// Shared JSON coding configuration (ISO-8601 dates, snake_case keys).
+/// Shared JSON coding configuration: ISO-8601 dates and snake_case keys, matching the
+/// Supabase/PostgREST wire format.
+///
+/// Keys go through ``PRVKeyCase`` rather than Foundation's
+/// `.convertFromSnakeCase` / `.convertToSnakeCase`, because that pair is not an inverse
+/// and mangles every acronym the domain models use: `salon_id` would decode as
+/// `salonId` (never `salonID`) and `galleryURLs` would encode as `gallery_ur_ls`
+/// (never `gallery_urls`).
 public enum JSONCoding {
     public static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        decoder.keyDecodingStrategy = .custom { codingPath -> any CodingKey in
+            guard let last = codingPath.last else { return PRVAnyCodingKey(stringValue: "") }
+            return PRVAnyCodingKey(stringValue: PRVKeyCase.toCamelCase(last.stringValue))
+        }
         return decoder
     }()
 
     public static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.keyEncodingStrategy = .custom { codingPath -> any CodingKey in
+            guard let last = codingPath.last else { return PRVAnyCodingKey(stringValue: "") }
+            return PRVAnyCodingKey(stringValue: PRVKeyCase.toSnakeCase(last.stringValue))
+        }
         return encoder
     }()
 }

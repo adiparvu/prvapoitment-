@@ -1,6 +1,7 @@
 import SwiftUI
 import MapKit
 import PRVModels
+import PRVNetworking
 import PRVDesignSystem
 
 /// The About section: story, opening hours, amenities, languages,

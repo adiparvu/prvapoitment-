@@ -1,5 +1,6 @@
 import SwiftUI
 import PRVModels
+import PRVNetworking
 import PRVDesignSystem
 
 /// The Services section: the salon's menu grouped by category. Each row

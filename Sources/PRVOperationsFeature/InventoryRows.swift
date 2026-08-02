@@ -23,12 +23,14 @@ struct InventoryValueTiles: View {
                 label: "Stock at cost",
                 value: OperationsFormat.compactCurrency(atCost)
             )
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel("Stock at cost \(atCost.formatted), \(OperationsFormat.integer(unitCount)) units")
 
             PRVStatTile(
                 label: "Retail value",
                 value: OperationsFormat.compactCurrency(atRetail)
             )
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel("Retail value \(atRetail.formatted), margin \(margin.formatted)")
 
             PRVStatTile(
@@ -36,6 +38,7 @@ struct InventoryValueTiles: View {
                 value: "\(lowStockCount)",
                 trend: lowStockCount > 0 ? .down("\(expiringCount) expiring") : .flat
             )
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel(
                 lowStockCount > 0
                     ? "\(lowStockCount) lines low on stock, \(expiringCount) expiring soon"

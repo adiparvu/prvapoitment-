@@ -124,15 +124,19 @@ struct ClientStatsRow: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: PRVSpacing.sm) {
             PRVStatTile(label: "Visits", value: "\(client.totalVisits)")
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(client.totalVisits) visits")
 
             PRVStatTile(label: "Lifetime spend", value: client.totalSpend.formatted)
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Lifetime spend \(client.totalSpend.formatted)")
 
             PRVStatTile(label: "Average visit", value: averageSpend.formatted)
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Average spend per visit \(averageSpend.formatted)")
 
             PRVStatTile(label: "Last visit", value: CRMFormat.lastVisit(client.lastVisitAt))
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Last visit \(CRMFormat.lastVisit(client.lastVisitAt))")
         }
     }

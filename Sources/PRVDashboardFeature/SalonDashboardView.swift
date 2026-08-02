@@ -132,6 +132,10 @@ public struct SalonDashboardView: View {
     /// A stat tile whose VoiceOver label is replaced with a full sentence — the
     /// tile's default reads deltas without saying what they are measured
     /// against.
+    ///
+    /// The tile publishes its own accessibility element, so the element has to
+    /// be re-created here before relabelling it; otherwise the inner label wins
+    /// and `kpi.accessibilityLabel` never reaches VoiceOver.
     private func tile(for kpi: DashboardKPI) -> some View {
         PRVStatTile(
             label: kpi.label,
@@ -139,6 +143,7 @@ public struct SalonDashboardView: View {
             trend: kpi.trend,
             sparkline: kpi.sparkline
         )
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(kpi.accessibilityLabel)
     }
 

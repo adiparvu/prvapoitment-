@@ -1,5 +1,6 @@
 import SwiftUI
 import PRVModels
+import PRVNetworking
 import PRVDesignSystem
 
 /// The Gallery section: a photo grid plus social presence rows (Instagram,

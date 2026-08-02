@@ -157,7 +157,8 @@ struct EmployeeCard: View {
                 ) {
                     isShowingPay.toggle()
                 }
-                .accessibilityLabel("\(compensationLabel). Pay details")
+                // PRVChip labels itself with its title, so the "pay details"
+                // disambiguation rides on the hint instead of a label override.
                 .accessibilityHint(isShowingPay ? "Hides pay details" : "Shows pay details")
 
                 PRVTag(

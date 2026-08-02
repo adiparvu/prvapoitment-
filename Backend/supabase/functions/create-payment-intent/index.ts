@@ -34,6 +34,7 @@ import {
 import { requireUser } from "../_shared/auth.ts";
 import { serviceClient, userClient } from "../_shared/supabase.ts";
 import { stripeClient, toMinorUnits } from "../_shared/stripe.ts";
+import { centsToNumber, fromCents, percentageOfCents, toCents } from "../_shared/money.ts";
 import { optionalEnv } from "../_shared/env.ts";
 
 interface RequestBody {
@@ -53,6 +54,7 @@ interface OrderRow {
   status: string;
   currency: string;
   amount_paid: string;
+  discount_reason: string | null;
   stripe_payment_intent_id: string | null;
   stripe_customer_id: string | null;
 }
@@ -91,7 +93,7 @@ Deno.serve(async (request) => {
     const { data: order, error: orderError } = await asUser
       .from("orders")
       .select(
-        "id, salon_id, client_id, appointment_id, status, currency, amount_paid, stripe_payment_intent_id, stripe_customer_id",
+        "id, salon_id, client_id, appointment_id, status, currency, amount_paid, discount_reason, stripe_payment_intent_id, stripe_customer_id",
       )
       .eq("id", orderId)
       .maybeSingle<OrderRow>();
@@ -120,22 +122,26 @@ Deno.serve(async (request) => {
     if (totalsError) throw fromPostgresError(totalsError, "Could not price that order.");
     if (!totals) throw HttpError.notFound("That order has no lines to pay for.");
 
-    const total = Number.parseFloat(totals.total_amount);
-    const alreadyPaid = Number.parseFloat(totals.amount_paid);
     const currency = order.currency.toUpperCase();
+    const admin = serviceClient();
 
-    const { chargeable, prepaymentPercent, discountReason } = await resolveChargeable({
-      request,
-      salonId: order.salon_id,
-      total,
-      alreadyPaid,
-      requestedPercent: body.prepayment_percent,
-    });
+    const { chargeableCents, prepaymentPercent, discountReason, discountCents } =
+      await resolveChargeable({
+        request,
+        admin,
+        salonId: order.salon_id,
+        orderId: order.id,
+        subtotalCents: toCents(totals.subtotal_amount),
+        totalCents: toCents(totals.total_amount),
+        alreadyPaidCents: toCents(totals.amount_paid),
+        requestedPercent: body.prepayment_percent,
+      });
 
-    if (chargeable <= 0) {
+    if (chargeableCents <= 0) {
       throw HttpError.conflict("There is nothing left to pay on this order.");
     }
 
+    const chargeable = centsToNumber(chargeableCents);
     const amountMinor = toMinorUnits(chargeable, currency);
     if (amountMinor < 50) {
       // Stripe's floor for most currencies; surfacing it here beats a raw
@@ -146,7 +152,6 @@ Deno.serve(async (request) => {
     }
 
     const stripe = stripeClient();
-    const admin = serviceClient();
 
     // A customer per platform account, reused across orders so saved cards and
     // Apple Pay behave the way the client expects.
@@ -217,13 +222,20 @@ Deno.serve(async (request) => {
       description: `PRV Beauty order ${order.id}`,
     }, { idempotencyKey });
 
+    // The discount the client was charged against has to land on the order as
+    // well as on the intent: `order_totals.total_amount` is what the webhook
+    // compares `amount_paid` to, so a discount that only reached Stripe would
+    // leave a fully prepaid order forever short of its own total.
     const { error: persistError } = await admin
       .from("orders")
       .update({
         stripe_payment_intent_id: intent.id,
         stripe_customer_id: customerId,
         idempotency_key: idempotencyKey,
-        discount_reason: discountReason ?? undefined,
+        ...(discountCents === null ? {} : {
+          discount_amount: fromCents(discountCents),
+          discount_reason: mergeDiscountReason(order.discount_reason, discountReason),
+        }),
         status: order.status === "draft" ? "awaiting_payment" : order.status,
       })
       .eq("id", order.id);

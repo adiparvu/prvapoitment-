@@ -159,12 +159,14 @@ public struct MarketingView: View {
     private var performanceTiles: some View {
         LazyVGrid(columns: columns, spacing: PRVSpacing.sm) {
             PRVStatTile(label: "Messages sent", value: OperationsFormat.integer(model.totalSent))
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(OperationsFormat.integer(model.totalSent)) messages sent")
 
             PRVStatTile(
                 label: "Open rate",
                 value: model.totalSent > 0 ? OperationsFormat.percent(model.openRate) : "—"
             )
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel(
                 model.totalSent > 0
                     ? "Open rate \(OperationsFormat.percent(model.openRate))"
@@ -172,12 +174,14 @@ public struct MarketingView: View {
             )
 
             PRVStatTile(label: "Bookings", value: OperationsFormat.integer(model.totalBookings))
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(OperationsFormat.integer(model.totalBookings)) bookings attributed")
 
             PRVStatTile(
                 label: "Attributed revenue",
                 value: OperationsFormat.compactCurrency(model.attributedRevenue)
             )
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel("Attributed revenue \(model.attributedRevenue.formatted)")
         }
     }

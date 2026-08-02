@@ -54,7 +54,11 @@ public struct PRVDependencies: Sendable {
         self.analytics = analytics
     }
 
-    /// One shared in-memory backend for previews, demo mode, and tests.
+    /// Wires every repository to one in-memory backend, for previews, demo mode, and tests.
+    ///
+    /// Pass a backend to seed or share a specific one; the default argument is an
+    /// expression evaluated per call, so each bare `inMemory()` mints a fresh actor with
+    /// its own state. Use ``sharedInMemory`` when the state must outlive a single call.
     public static func inMemory(_ backend: InMemoryBackend = InMemoryBackend()) -> PRVDependencies {
         PRVDependencies(
             auth: backend,
@@ -72,11 +76,19 @@ public struct PRVDependencies: Sendable {
             analytics: backend
         )
     }
+
+    /// The one in-memory container every unconfigured preview shares.
+    ///
+    /// `@Entry` expands its initializer into a *computed* `defaultValue`, so the
+    /// expression runs on every unset read of the key. Storing the container here
+    /// evaluates ``inMemory(_:)`` exactly once, which is what makes a write such as
+    /// `deps.salons.markViewed(salonID:)` visible to a later read in another view.
+    public static let sharedInMemory: PRVDependencies = .inMemory()
 }
 
 extension EnvironmentValues {
-    /// Defaults to the in-memory backend so previews work with zero setup.
-    @Entry public var prvDependencies: PRVDependencies = .inMemory()
+    /// Defaults to one shared in-memory backend so previews work with zero setup.
+    @Entry public var prvDependencies: PRVDependencies = .sharedInMemory
 }
 
 // MARK: - Session

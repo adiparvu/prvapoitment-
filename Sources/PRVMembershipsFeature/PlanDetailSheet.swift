@@ -92,8 +92,8 @@ struct PlanDetailSheet: View {
                 GradientMedallion(
                     systemName: style.symbolName,
                     gradient: .membershipScrim,
-                    symbolColor: style.onGradient,
-                    size: 52
+                    size: 52,
+                    symbolColor: style.onGradient
                 )
 
                 VStack(alignment: .leading, spacing: 2) {

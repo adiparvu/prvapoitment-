@@ -331,6 +331,7 @@ struct DashboardSkeleton: View {
                 }
             }
         }
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading your dashboard")
     }
 }
