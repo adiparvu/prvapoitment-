@@ -14,7 +14,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HARNESS="${ROOT}/.build-linux"
 
-MODULES=(PRVFoundation PRVModels PRVBookingKit PRVPaymentsKit PRVLoyaltyKit)
+MODULES=(PRVFoundation PRVModels PRVBookingKit PRVPaymentsKit PRVLoyaltyKit PRVPersistence PRVNetworking)
 TEST_MODULES=(PRVModelsTests PRVBookingKitTests PRVPaymentsKitTests PRVLoyaltyKitTests)
 
 # The harness symlinks the real sources, so it can never drift from what ships.
@@ -42,6 +42,17 @@ let package = Package(
         .target(name: "PRVBookingKit", dependencies: ["PRVFoundation", "PRVModels"], swiftSettings: settings),
         .target(name: "PRVPaymentsKit", dependencies: ["PRVFoundation", "PRVModels"], swiftSettings: settings),
         .target(name: "PRVLoyaltyKit", dependencies: ["PRVFoundation", "PRVModels"], swiftSettings: settings),
+        .target(name: "PRVPersistence", dependencies: ["PRVFoundation", "PRVModels"], swiftSettings: settings),
+        // The repository contracts and the in-memory backend behind every
+        // preview and the demo build are pure Foundation. Dependencies.swift
+        // is excluded: its SwiftUI @Entry environment key needs an Apple SDK.
+        .target(
+            name: "PRVNetworking",
+            dependencies: ["PRVFoundation", "PRVModels"],
+            exclude: ["Dependencies.swift"],
+            sources: ["APIClient.swift", "Repositories.swift", "InMemoryBackend.swift", "WireKeys.swift"],
+            swiftSettings: settings
+        ),
         .testTarget(name: "PRVModelsTests", dependencies: ["PRVModels"], swiftSettings: settings),
         .testTarget(name: "PRVBookingKitTests", dependencies: ["PRVBookingKit"], swiftSettings: settings),
         .testTarget(name: "PRVPaymentsKitTests", dependencies: ["PRVPaymentsKit"], swiftSettings: settings),

@@ -1,4 +1,9 @@
 import Foundation
+#if canImport(FoundationNetworking)
+// URLSession lives in a separate module on non-Apple platforms, where the
+// repository contracts and in-memory backend are built for domain testing.
+import FoundationNetworking
+#endif
 import PRVFoundation
 
 public enum APIError: Error, Sendable {
