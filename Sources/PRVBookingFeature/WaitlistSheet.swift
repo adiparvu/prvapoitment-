@@ -159,3 +159,12 @@ struct WaitlistSheet: View {
         }
     }
 }
+
+#Preview("Waitlist") {
+    WaitlistSheet(
+        serviceName: PreviewData.serviceBalayage.name,
+        professionalName: PreviewData.stylistAmelie.displayName,
+        day: Date.now.adding(days: 2),
+        isJoining: false
+    ) { _, _ in true }
+}

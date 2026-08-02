@@ -32,7 +32,8 @@ public struct BookingFlowView: View {
     }
 
     public var body: some View {
-        @Bindable var model = model
+        // A local bindable projection for the two-way bound properties below.
+        @Bindable var bindableModel = model
 
         VStack(spacing: PRVSpacing.md) {
             if model.step != .confirmation, model.phase == .loaded {
@@ -61,8 +62,8 @@ public struct BookingFlowView: View {
                 PRVBottomBar { bottomBar }
             }
         }
-        .sheet(isPresented: $model.isWaitlistPresented) { waitlistSheet }
-        .prvToast($model.toast)
+        .sheet(isPresented: $bindableModel.isWaitlistPresented) { waitlistSheet }
+        .prvToast($bindableModel.toast)
         .task { await model.load(using: deps) }
         .prvAnimation(PRVMotion.morph, value: model.step)
     }
@@ -97,7 +98,7 @@ public struct BookingFlowView: View {
             ProfessionalSelectionStepView(model: model)
                 .transition(stepTransition)
         case .time:
-            TimeSelectionStepView(model: model, reloadSlots: reloadSlots)
+            TimeSelectionStepView(model: model, reloadSlots: { reloadSlots() })
                 .transition(stepTransition)
                 .task(id: model.slotRequestKey) {
                     await model.loadSlots(using: deps)
@@ -114,7 +115,7 @@ public struct BookingFlowView: View {
                 BookingConfirmationView(
                     confirmation: confirmation,
                     onPayNow: { router.present(.checkout(confirmation.order.id)) },
-                    onDone: finish,
+                    onDone: { finish() },
                     onMessage: { model.toast = $0 }
                 )
                 .transition(stepTransition)

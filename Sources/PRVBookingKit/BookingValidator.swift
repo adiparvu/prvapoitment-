@@ -46,39 +46,39 @@ public enum BookingValidationError: LocalizedError, Hashable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .noServicesSelected:
-            "Choose at least one service to continue."
+            return "Choose at least one service to continue."
         case .unknownService:
-            "That service is no longer available at this salon."
+            return "That service is no longer available at this salon."
         case .inactiveService:
-            "That service is not currently bookable."
+            return "That service is not currently bookable."
         case .serviceNotOfferedBySalon:
-            "That service belongs to a different location."
+            return "That service belongs to a different location."
         case .unknownAddOn:
-            "One of the selected add-ons is no longer offered."
+            return "One of the selected add-ons is no longer offered."
         case .unknownProfessional:
-            "That professional is no longer part of this team."
+            return "That professional is no longer part of this team."
         case .professionalCannotPerformService:
-            "The professional you picked doesn't perform this service."
+            return "The professional you picked doesn't perform this service."
         case .invalidSlotBounds:
-            "The selected time is invalid. Pick another slot."
+            return "The selected time is invalid. Pick another slot."
         case let .slotDurationMismatch(expected, actual):
-            "This visit needs \(expected) minutes but the slot is \(actual)."
+            return "This visit needs \(expected) minutes but the slot is \(actual)."
         case .salonClosedOnRequestedDay:
-            "The salon is closed that day."
+            return "The salon is closed that day."
         case .slotOutsideOpeningHours:
-            "That time falls outside the salon's opening hours."
+            return "That time falls outside the salon's opening hours."
         case .slotInThePast:
-            "That time has already passed."
+            return "That time has already passed."
         case let .leadTimeNotMet(minutes):
-            "This salon needs at least \(minutes) minutes' notice."
+            return "This salon needs at least \(minutes) minutes' notice."
         case .prepaymentRequired:
-            "This service requires a deposit. Choose a prepayment option."
+            return "This service requires a deposit. Choose a prepayment option."
         case .prepaymentPercentNotOffered:
-            "That prepayment option isn't offered by this salon."
+            return "That prepayment option isn't offered by this salon."
         case .duplicateClientInGroupBooking:
-            "Each guest can only be added once."
+            return "Each guest can only be added once."
         case .invalidRecurrenceOccurrenceCount:
-            "A repeating booking needs at least one visit."
+            return "A repeating booking needs at least one visit."
         }
     }
 }

@@ -118,14 +118,15 @@ struct RescheduleSheet: View {
     }
 
     var body: some View {
-        @Bindable var model = model
+        // A local bindable projection for the day strip's two-way binding.
+        @Bindable var bindableModel = model
 
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: PRVSpacing.lg) {
                     currentCard
 
-                    PRVDateStrip(selection: $model.selectedDay, days: 30)
+                    PRVDateStrip(selection: $bindableModel.selectedDay, days: 30)
                         .padding(.horizontal, -PRVSpacing.md)
 
                     SlotBoardView(

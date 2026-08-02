@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import PRVBookingKit
 import PRVDesignSystem
 import PRVFoundation
 import PRVModels
@@ -18,6 +19,14 @@ struct AppointmentSheetRoute: Identifiable, Hashable, Sendable {
     var id: String { "\(kind.rawValue)-\(appointment.id.description)" }
 }
 
+/// The two segments of the bookings list.
+enum AppointmentScope: String, CaseIterable, Hashable, Sendable, Identifiable {
+    case upcoming = "Upcoming"
+    case past = "Past"
+
+    var id: String { rawValue }
+}
+
 /// Screen model backing ``AppointmentsListView``.
 ///
 /// Loads the client's appointments together with the orders, invoices, and
@@ -33,14 +42,6 @@ final class AppointmentsListModel {
         case failed(String)
     }
 
-    /// The two segments of the list.
-    enum Scope: String, CaseIterable, Hashable, Sendable, Identifiable {
-        case upcoming = "Upcoming"
-        case past = "Past"
-
-        var id: String { rawValue }
-    }
-
     private(set) var phase: Phase = .loading
     private(set) var appointments: [Appointment] = []
     private(set) var salons: [Salon.ID: Salon] = [:]
@@ -49,9 +50,12 @@ final class AppointmentsListModel {
     /// Appointments with a mutation in flight (cancel/reschedule).
     private(set) var busyAppointmentIDs: Set<Appointment.ID> = []
 
-    var scope: Scope = .upcoming
+    var scope: AppointmentScope = .upcoming
     var sheet: AppointmentSheetRoute?
     var toast: PRVToast?
+
+    /// Deterministic fee/refund rules shared with the server.
+    private let cancellationEngine = CancellationEngine()
 
     /// Creates an empty list model; call ``load(for:using:)`` to populate it.
     init() {}
@@ -150,12 +154,20 @@ final class AppointmentsListModel {
         busyAppointmentIDs.contains(appointment.id)
     }
 
-    /// What cancelling this appointment would cost right now.
+    /// What the client has already paid toward an appointment.
+    func amountPaid(for appointment: Appointment) -> Money {
+        order(for: appointment)?.amountPaid ?? .zero(appointment.totalPrice.currency)
+    }
+
+    /// What cancelling this appointment would cost right now, straight from the
+    /// booking kit's cancellation engine.
     func cancellationAssessment(for appointment: Appointment) -> CancellationAssessment {
-        CancellationAssessor.assess(
-            appointment: appointment,
+        cancellationEngine.assess(
             policies: salon(for: appointment)?.policies ?? SalonPolicies(),
-            amountPaid: order(for: appointment)?.amountPaid ?? .zero(appointment.totalPrice.currency)
+            appointmentStart: appointment.start ?? .now,
+            now: .now,
+            amountPaid: amountPaid(for: appointment),
+            trigger: .clientCancellation
         )
     }
 

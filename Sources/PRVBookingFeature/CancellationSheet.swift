@@ -1,4 +1,5 @@
 import SwiftUI
+import PRVBookingKit
 import PRVDesignSystem
 import PRVFoundation
 import PRVModels
@@ -10,8 +11,11 @@ struct CancellationSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let appointment: Appointment
+    /// The booking kit's verdict for cancelling right now.
     let assessment: CancellationAssessment
     let policies: SalonPolicies
+    /// What the client has already paid toward this visit.
+    let amountPaid: Money
     /// Whether the cancellation request is in flight.
     let isCancelling: Bool
     /// Commits the cancellation. Returns `true` when it succeeded.
@@ -89,7 +93,7 @@ struct CancellationSheet: View {
         PRVGlassCard(radius: PRVRadius.xl, padding: PRVSpacing.lg) {
             VStack(alignment: .leading, spacing: PRVSpacing.sm) {
                 HStack(spacing: PRVSpacing.sm) {
-                    Image(systemName: assessment.isFree ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
+                    Image(systemName: assessment.symbolName)
                         .font(.title2)
                         .foregroundStyle(assessment.isFree ? Color.prv.success : Color.prv.warning)
                         .accessibilityHidden(true)
@@ -105,7 +109,7 @@ struct CancellationSheet: View {
                     Spacer(minLength: 0)
                 }
 
-                Text(assessment.summary)
+                Text(assessment.summary(amountPaid: amountPaid))
                     .prvStyle(.subheadline)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -120,8 +124,8 @@ struct CancellationSheet: View {
     private var breakdownCard: some View {
         PRVGlassCard {
             VStack(spacing: PRVSpacing.xs) {
-                BookingSummaryRow(label: "Appointment total", value: assessment.total.formatted)
-                BookingSummaryRow(label: "Already paid", value: assessment.amountPaid.formatted)
+                BookingSummaryRow(label: "Appointment total", value: appointment.totalPrice.formatted)
+                BookingSummaryRow(label: "Already paid", value: amountPaid.formatted)
                 BookingSummaryRow(
                     label: "Cancellation fee",
                     value: assessment.fee.isZero ? "None" : "−\(assessment.fee.formatted)",
@@ -130,9 +134,9 @@ struct CancellationSheet: View {
                 Divider()
                 BookingSummaryRow(
                     label: "Refunded to you",
-                    value: assessment.refund.formatted,
+                    value: assessment.refundDue.formatted,
                     isProminent: true,
-                    tint: assessment.refund.isZero ? nil : Color.prv.success
+                    tint: assessment.refundDue.isZero ? nil : Color.prv.success
                 )
             }
         }
@@ -183,15 +187,15 @@ struct CancellationSheet: View {
 
 // MARK: - Previews
 
-/// Builds an assessment `hours` before the fixture appointment starts.
+/// Builds an assessment a given number of hours before the fixture starts.
 private func makePreviewAssessment(hoursBeforeStart: Int, paid: Money) -> CancellationAssessment {
-    let appointment = PreviewData.upcomingAppointment
-    let start = appointment.start ?? .now
-    return CancellationAssessor.assess(
-        appointment: appointment,
+    let start = PreviewData.upcomingAppointment.start ?? .now
+    return CancellationEngine().assess(
         policies: PreviewData.salonLumiere.policies,
+        appointmentStart: start,
+        now: start.addingTimeInterval(-Double(hoursBeforeStart) * 3_600),
         amountPaid: paid,
-        now: start.addingTimeInterval(-Double(hoursBeforeStart) * 3_600)
+        trigger: .clientCancellation
     )
 }
 
@@ -200,6 +204,7 @@ private func makePreviewAssessment(hoursBeforeStart: Int, paid: Money) -> Cancel
         appointment: PreviewData.upcomingAppointment,
         assessment: makePreviewAssessment(hoursBeforeStart: 72, paid: Money(92.50)),
         policies: PreviewData.salonLumiere.policies,
+        amountPaid: Money(92.50),
         isCancelling: false
     ) { _ in true }
 }
@@ -209,6 +214,7 @@ private func makePreviewAssessment(hoursBeforeStart: Int, paid: Money) -> Cancel
         appointment: PreviewData.upcomingAppointment,
         assessment: makePreviewAssessment(hoursBeforeStart: 3, paid: Money(92.50)),
         policies: PreviewData.salonLumiere.policies,
+        amountPaid: Money(92.50),
         isCancelling: false
     ) { _ in true }
     .preferredColorScheme(.dark)

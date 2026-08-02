@@ -18,8 +18,6 @@ enum SlotsPhase: Equatable, Sendable {
         if case .loaded(let slots) = self { return slots }
         return []
     }
-
-    var isLoading: Bool { self == .loading }
 }
 
 /// Services grouped under one business category for the first step's menu.
@@ -335,7 +333,7 @@ final class BookingFlowModel {
     /// full team when the salon has not mapped services to its staff.
     var eligibleProfessionals: [Professional] {
         guard !selectedServiceIDs.isEmpty else { return professionals }
-        let matching = professionals.filter(canPerformSelection)
+        let matching = professionals.filter { canPerformSelection($0) }
         return matching.isEmpty ? professionals : matching
     }
 
@@ -402,21 +400,12 @@ final class BookingFlowModel {
         }
     }
 
-    /// Slots grouped Morning / Afternoon / Evening.
-    var slotSections: [SlotSection] { slotsPhase.slots.groupedByPeriod() }
-
-    /// The three slots that fit the salon's calendar best.
+    /// The three slots that fit the salon's calendar best. Hidden when the day
+    /// is quiet enough that every time is already visible at a glance.
     var recommendedSlots: [TimeSlot] {
         let slots = slotsPhase.slots
         guard slots.count > 3 else { return [] }
         return slots.topRecommended()
-    }
-
-    /// True when the day has been queried and holds nothing bookable — the
-    /// moment to offer the waitlist.
-    var hasNoAvailability: Bool {
-        if case .loaded(let slots) = slotsPhase { return slots.isEmpty }
-        return false
     }
 
     /// Chooses a slot.
@@ -572,11 +561,11 @@ final class BookingFlowModel {
         )
     }
 
-    /// Seats reserved for guests joining the client.
+    /// Mints one seat identifier per guest joining the client.
     ///
-    /// - Note: Guests are placeholder seats until they claim their invitation;
+    /// - Note: Seats are placeholders until each guest claims their invitation;
     ///   a real invite flow resolves them to platform accounts server-side.
-    var additionalClientIDs: [User.ID] {
+    func makeGuestSeatIDs() -> [User.ID] {
         guard isGroupBooking, guestCount > 0 else { return [] }
         return (0 ..< guestCount).map { _ in User.ID() }
     }
@@ -607,7 +596,7 @@ final class BookingFlowModel {
                 )
             },
             slot: slot,
-            additionalClientIDs: additionalClientIDs,
+            additionalClientIDs: makeGuestSeatIDs(),
             recurrence: recurrenceRule,
             notes: notes.trimmed.isBlank ? nil : notes.trimmed,
             prepaymentPercent: prepaymentPercent,

@@ -30,7 +30,7 @@ public struct AppointmentsListView: View {
             VStack(spacing: PRVSpacing.md) {
                 PRVSegmentedGlassControl(
                     selection: $model.scope,
-                    options: AppointmentsListModel.Scope.allCases,
+                    options: AppointmentScope.allCases,
                     title: \.rawValue
                 )
                 .padding(.horizontal, PRVSpacing.md)
@@ -156,6 +156,7 @@ public struct AppointmentsListView: View {
                 appointment: route.appointment,
                 assessment: model.cancellationAssessment(for: route.appointment),
                 policies: model.salon(for: route.appointment)?.policies ?? SalonPolicies(),
+                amountPaid: model.amountPaid(for: route.appointment),
                 isCancelling: model.isBusy(route.appointment)
             ) { reason in
                 await model.cancel(route.appointment, reason: reason, using: deps)

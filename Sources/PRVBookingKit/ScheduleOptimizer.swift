@@ -79,14 +79,14 @@ public struct ScheduleOptimizer: Sendable {
     /// ``scoredCandidates(_:in:)`` when scoring a whole list, since this rebuilds
     /// the busy index on every call.
     public func score(_ candidate: SlotCandidate, in input: AvailabilityInput) -> Double {
-        score(candidate, context: Context(input: input, calendar: calendar))
+        score(candidate, context: Context(input: input))
     }
 
     /// Returns every candidate with ``TimeSlot/optimizationScore`` filled in,
     /// ordered chronologically.
     public func scoredCandidates(_ candidates: [SlotCandidate], in input: AvailabilityInput) -> [SlotCandidate] {
         guard !candidates.isEmpty else { return [] }
-        let context = Context(input: input, calendar: calendar)
+        let context = Context(input: input)
         return candidates
             .map { $0.scored(score($0, context: context)) }
             .sorted { lhs, rhs in
@@ -141,7 +141,7 @@ public struct ScheduleOptimizer: Sendable {
         let rangeStart: Date
         let rangeSpan: TimeInterval
 
-        init(input: AvailabilityInput, calendar: Calendar) {
+        init(input: AvailabilityInput) {
             self.busy = BusyIndex(appointments: input.existingAppointments)
             self.openingHours = input.openingHours
             self.rangeStart = input.rangeStart
@@ -156,12 +156,16 @@ public struct ScheduleOptimizer: Sendable {
 
         // Neighbours only count inside the same opening window: yesterday's last
         // appointment must not rob today's first slot of its edge-anchor credit.
-        let previousEnd = context.busy
-            .lastEnd(before: block.start, for: candidate.professionalID)
-            .flatMap { $0 > window.start ? $0 : nil }
-        let nextStart = context.busy
-            .nextStart(after: block.end, for: candidate.professionalID)
-            .flatMap { $0 < window.end ? $0 : nil }
+        var previousEnd: Date?
+        if let end = context.busy.lastEnd(before: block.start, for: candidate.professionalID),
+           end > window.start {
+            previousEnd = end
+        }
+        var nextStart: Date?
+        if let start = context.busy.nextStart(after: block.end, for: candidate.professionalID),
+           start < window.end {
+            nextStart = start
+        }
 
         let gapBefore = calendar.minutes(from: previousEnd ?? window.start, to: block.start)
         let gapAfter = calendar.minutes(from: block.end, to: nextStart ?? window.end)

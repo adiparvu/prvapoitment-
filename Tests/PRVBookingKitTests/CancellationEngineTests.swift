@@ -160,11 +160,11 @@ struct CancellationEngineTests {
             policies: policies,
             appointmentStart: start,
             now: Fixtures.mondayAt(9),
-            amountPaid: Money(45)
+            amountPaid: Money(90)
         )
 
-        #expect(deposit.fee == Money(22.5))
-        #expect(deposit.refundDue == Money(22.5))
+        #expect(deposit.fee == Money(45))
+        #expect(deposit.refundDue == Money(45))
     }
 
     @Test("The appointment overload reads the start from the appointment items")
