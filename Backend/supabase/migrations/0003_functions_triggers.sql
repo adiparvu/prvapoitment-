@@ -738,7 +738,12 @@ begin
       '%s has %s left at %s (threshold %s). Reorder to avoid running out.',
       new.name, new.stock_quantity, coalesce(v_salon_name, 'your salon'), new.low_stock_threshold
     ),
-    jsonb_build_object('kind', 'inventory', 'product_id', new.id, 'salon_id', new.salon_id)
+    -- `route` must decode as an `AppRoute`: Swift's synthesized enum encoding,
+    -- one key naming the case with its positional values keyed `_0`. There is
+    -- no inventory case, so the alert opens the salon the stock belongs to —
+    -- an ad-hoc shape here fails to decode and takes the whole Notification
+    -- Centre page down with it.
+    jsonb_build_object('salon', jsonb_build_object('_0', new.salon_id::text))
   from unnest(v_recipients) as recipient;
 
   return null;

@@ -12,7 +12,10 @@
  *      at all — there is no "check the client_id matches" branch to forget.
  *   2. **The amount is recomputed from the order lines.** Whatever the client
  *      sends as a total is ignored; the figure charged is derived from
- *      `order_totals`, the same view the receipt is rendered from.
+ *      `order_totals`, the same view the receipt is rendered from — in whole
+ *      minor units with banker's rounding, so it lands on the same cent
+ *      `PRVPaymentsKit` quoted before the tap. Any discount earned along the
+ *      way is written back to the order, not just applied to the charge.
  *   3. **The intent is created with an idempotency key derived from the order
  *      and the amount.** A retried request — a flaky network, an impatient tap
  *      — resolves to the same PaymentIntent instead of a second charge.
@@ -151,6 +154,27 @@ Deno.serve(async (request) => {
       );
     }
 
+    // The discount the client is charged against has to land on the order as
+    // well as on the intent: `order_totals.total_amount` is what the webhook
+    // compares `amount_paid` to, so a discount that only reached Stripe would
+    // leave a fully prepaid order forever short of its own total. It is written
+    // before the intent exists, and recomputed absolutely, so every path out of
+    // this function — new intent, reused intent, retargeted intent — leaves the
+    // order priced the same way.
+    if (discountCents !== null) {
+      const { error: discountError } = await admin
+        .from("orders")
+        .update({
+          discount_amount: fromCents(discountCents),
+          discount_reason: mergeDiscountReason(order.discount_reason, discountReason),
+        })
+        .eq("id", order.id);
+
+      if (discountError) {
+        throw fromPostgresError(discountError, "Could not price that order.");
+      }
+    }
+
     const stripe = stripeClient();
 
     // A customer per platform account, reused across orders so saved cards and
@@ -222,20 +246,12 @@ Deno.serve(async (request) => {
       description: `PRV Beauty order ${order.id}`,
     }, { idempotencyKey });
 
-    // The discount the client was charged against has to land on the order as
-    // well as on the intent: `order_totals.total_amount` is what the webhook
-    // compares `amount_paid` to, so a discount that only reached Stripe would
-    // leave a fully prepaid order forever short of its own total.
     const { error: persistError } = await admin
       .from("orders")
       .update({
         stripe_payment_intent_id: intent.id,
         stripe_customer_id: customerId,
         idempotency_key: idempotencyKey,
-        ...(discountCents === null ? {} : {
-          discount_amount: fromCents(discountCents),
-          discount_reason: mergeDiscountReason(order.discount_reason, discountReason),
-        }),
         status: order.status === "draft" ? "awaiting_payment" : order.status,
       })
       .eq("id", order.id);
@@ -260,25 +276,53 @@ Deno.serve(async (request) => {
   }
 });
 
+/** The label every full-prepayment discount reason starts with. */
+const PREPAYMENT_DISCOUNT_LABEL = "Full prepayment discount";
+
+/** How `discount_reason` joins the components that make up a discount. */
+const DISCOUNT_REASON_SEPARATOR = " + ";
+
 /**
- * Works out what to charge now.
+ * Works out what to charge now, in whole minor units.
  *
  * With no prepayment requested this is simply the outstanding balance. With one
  * requested, the percentage must be one the salon actually offers — a client
  * cannot invent a 5% deposit — and paying in full earns the salon's configured
  * full-prepayment discount.
+ *
+ * Every step mirrors `PRVPaymentsKit.PrepaymentCalculator`: integer cents,
+ * banker's rounding, and the full level charging the payable total outright
+ * rather than 100% of it, so the figure quoted before the tap is the figure
+ * Stripe captures.
+ *
+ * `discountCents` is the order's whole discount recomputed from first
+ * principles — the coupon redeemed at booking plus the prepayment discount just
+ * earned — so re-running this for a retried or retargeted intent settles on the
+ * same number instead of compounding.
  */
 async function resolveChargeable(input: {
   request: Request;
+  admin: ReturnType<typeof serviceClient>;
   salonId: string;
-  total: number;
-  alreadyPaid: number;
+  orderId: string;
+  subtotalCents: number;
+  totalCents: number;
+  alreadyPaidCents: number;
   requestedPercent?: number;
-}): Promise<{ chargeable: number; prepaymentPercent: number | null; discountReason: string | null }> {
-  const outstanding = round2(Math.max(input.total - input.alreadyPaid, 0));
-
+}): Promise<{
+  chargeableCents: number;
+  prepaymentPercent: number | null;
+  discountReason: string | null;
+  /** `null` when no percentage was requested — leave the order's discount alone. */
+  discountCents: number | null;
+}> {
   if (input.requestedPercent === undefined || input.requestedPercent === null) {
-    return { chargeable: outstanding, prepaymentPercent: null, discountReason: null };
+    return {
+      chargeableCents: Math.max(input.totalCents - input.alreadyPaidCents, 0),
+      prepaymentPercent: null,
+      discountReason: null,
+      discountCents: null,
+    };
   }
 
   const percent = input.requestedPercent;
@@ -300,18 +344,68 @@ async function resolveChargeable(input: {
     );
   }
 
-  let base = input.total;
-  let discountReason: string | null = null;
+  // The coupon redeemed at booking is the only other discount on an order, and
+  // `coupon_redemptions` is its audit trail — reading it back keeps the two
+  // components independent instead of layering one on top of the other.
+  const couponDiscountCents = await couponDiscountCentsForOrder(input.admin, input.orderId);
+  const beforePrepaymentCents = Math.max(input.subtotalCents - couponDiscountCents, 0);
 
-  if (percent === 100 && (policy?.full_prepayment_discount_percent ?? 0) > 0) {
-    const discount = round2(base * (policy!.full_prepayment_discount_percent / 100));
-    base = round2(base - discount);
-    discountReason = `Full prepayment discount (${policy!.full_prepayment_discount_percent}%)`;
+  const fullDiscountPercent = policy?.full_prepayment_discount_percent ?? 0;
+  const prepaymentDiscountCents = percent === 100 && fullDiscountPercent > 0
+    ? percentageOfCents(beforePrepaymentCents, fullDiscountPercent)
+    : 0;
+  const discountReason = prepaymentDiscountCents > 0
+    ? `${PREPAYMENT_DISCOUNT_LABEL} (${fullDiscountPercent}%)`
+    : null;
+
+  const payableCents = Math.max(beforePrepaymentCents - prepaymentDiscountCents, 0);
+  const targetCents = percent === 100
+    ? payableCents
+    : Math.min(percentageOfCents(payableCents, percent), payableCents);
+
+  return {
+    chargeableCents: Math.max(targetCents - input.alreadyPaidCents, 0),
+    prepaymentPercent: percent,
+    discountReason,
+    discountCents: couponDiscountCents + prepaymentDiscountCents,
+  };
+}
+
+/** What the coupon applied at booking took off this order, in whole cents. */
+async function couponDiscountCentsForOrder(
+  admin: ReturnType<typeof serviceClient>,
+  orderId: string,
+): Promise<number> {
+  const { data, error } = await admin
+    .from("coupon_redemptions")
+    .select("amount")
+    .eq("order_id", orderId);
+
+  if (error) {
+    // Pricing must not fall over because the audit trail is unreadable; the
+    // order keeps whatever discount it already carries.
+    console.error("Could not read coupon redemptions for order", error);
+    return 0;
   }
 
-  const target = round2(base * (percent / 100));
-  const chargeable = round2(Math.max(target - input.alreadyPaid, 0));
-  return { chargeable, prepaymentPercent: percent, discountReason };
+  return (data ?? [])
+    .map((row) => (row as { amount: string }).amount)
+    .reduce((sum, amount) => sum + toCents(amount), 0);
+}
+
+/**
+ * Rebuilds `discount_reason` so the prepayment component is replaced rather
+ * than appended, and the coupon reason written at booking survives a client
+ * changing its mind about how much to pay up front.
+ */
+function mergeDiscountReason(existing: string | null, prepayment: string | null): string | null {
+  const kept = (existing ?? "")
+    .split(DISCOUNT_REASON_SEPARATOR)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0 && !part.startsWith(PREPAYMENT_DISCOUNT_LABEL));
+
+  if (prepayment) kept.push(prepayment);
+  return kept.length > 0 ? kept.join(DISCOUNT_REASON_SEPARATOR) : null;
 }
 
 /** Finds or creates the Stripe customer for this account. */
@@ -363,9 +457,4 @@ async function maybeEphemeralKey(
     console.error("Could not create ephemeral key", error);
     return null;
   }
-}
-
-/** Money is exact to the cent on both sides of the wire. */
-function round2(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }

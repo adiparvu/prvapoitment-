@@ -253,7 +253,8 @@ final class SalonScheduleModel {
     /// The day's bookings, earliest first.
     private(set) var appointments: [Appointment] = []
 
-    /// Day being shown, normalized to the start of the day.
+    /// Day being shown. Seeded at the start of the day; the date strip writes
+    /// start-of-day values too, so the repository query stays day-aligned.
     var day: Date
 
     /// Creates the model for one day.
@@ -263,7 +264,8 @@ final class SalonScheduleModel {
 
     // MARK: Derived
 
-    /// Bookings that still need something from the front desk today.
+    /// Bookings on the selected day that still need something from the front
+    /// desk (arrivals to check in, treatments to close out).
     var openCount: Int {
         appointments.count { $0.status.isActive }
     }

@@ -40,12 +40,10 @@ struct RootView: View {
                 // `AuthRootView`'s `dismiss()` — how it hands control back
                 // after the guest sheet — resolves to a real presentation and
                 // reveals the browse-only experience underneath.
-                ClientExperienceView(
-                    endGuestBrowsing: isBrowsingAsGuest ? { isBrowsingAsGuest = false } : nil
-                )
-                .fullScreenCover(isPresented: isPresentingAuth) {
-                    AuthRootView()
-                }
+                ClientExperienceView(endGuestBrowsing: guestEscape)
+                    .fullScreenCover(isPresented: isPresentingAuth) {
+                        AuthRootView()
+                    }
             }
         }
         .animation(PRVMotion.gentle, value: session.isAuthenticated)
@@ -69,6 +67,13 @@ struct RootView: View {
                 isBrowsingAsGuest = true
             }
         )
+    }
+
+    /// The way back to the welcome screen while browsing as a guest; `nil`
+    /// for signed-in clients, who reach sign-out through Settings instead.
+    private var guestEscape: (() -> Void)? {
+        guard isBrowsingAsGuest else { return nil }
+        return { isBrowsingAsGuest = false }
     }
 
     /// Keeps `AppRouter.selectedTab` inside the tab set the active experience
@@ -100,6 +105,11 @@ private struct LaunchView: View {
 private struct ClientExperienceView: View {
     @Environment(AppRouter.self) private var router
 
+    /// Non-`nil` while the visitor is browsing without an account. Guests get
+    /// the shell's own "Sign In" affordance, which brings the welcome screen
+    /// back — the feature-level guest states only explain what stays locked.
+    let endGuestBrowsing: (() -> Void)?
+
     var body: some View {
         TabView(selection: tabSelection) {
             ForEach(AppTab.clientTabs, id: \.self) { tab in
@@ -109,6 +119,7 @@ private struct ClientExperienceView: View {
                             .navigationDestination(for: AppRoute.self) { route in
                                 RouteDestinationView(route: route)
                             }
+                            .toolbar { guestToolbarContent }
                     }
                 }
             }
@@ -116,6 +127,19 @@ private struct ClientExperienceView: View {
         .sheet(item: sheetBinding) { route in
             NavigationStack {
                 RouteDestinationView(route: route.route)
+            }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var guestToolbarContent: some ToolbarContent {
+        if let endGuestBrowsing {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Sign In") {
+                    PRVHaptics.tap()
+                    endGuestBrowsing()
+                }
+                .accessibilityHint("Returns to the welcome screen to sign in or create an account.")
             }
         }
     }

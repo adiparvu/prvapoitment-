@@ -31,6 +31,7 @@ import {
 } from "../_shared/errors.ts";
 import { isSalonMember, requireUser } from "../_shared/auth.ts";
 import { serviceClient, userClient } from "../_shared/supabase.ts";
+import { fromCents, percentageOfCents, toCents } from "../_shared/money.ts";
 import { appRoute, createAndFanOut, salonStaffUserIds } from "../_shared/notify.ts";
 
 interface BookingItem {
@@ -49,6 +50,23 @@ interface BookingRequestBody {
   notes?: string | null;
   prepayment_percent?: number | null;
   coupon_code?: string | null;
+}
+
+/** Mirrors the columns of `coupons` that decide what a code is worth. */
+interface CouponRow {
+  id: string;
+  code: string;
+  discount_kind: "percent" | "fixed";
+  discount_percent: number | null;
+  discount_amount: string | null;
+  minimum_spend_amount: string | null;
+}
+
+/** A coupon that applies, priced against this order. */
+interface AppliedCoupon {
+  readonly id: string;
+  readonly code: string;
+  readonly discountCents: number;
 }
 
 interface AppointmentPayload {
@@ -143,6 +161,10 @@ Deno.serve(async (request) => {
  * Returns the order id, or `null` when the order could not be created — a
  * failure here must not undo a confirmed booking, so it is logged and reported
  * rather than thrown.
+ *
+ * A coupon becomes money here, not a label: `orders.discount_amount` is what
+ * `order_totals.total_amount` subtracts, so a code recorded only in
+ * `discount_reason` would still bill the client the full price.
  */
 async function createOrderForAppointment(
   admin: ReturnType<typeof serviceClient>,
@@ -153,6 +175,14 @@ async function createOrderForAppointment(
   if (appointment.items.length === 0) return null;
 
   const currency = appointment.items[0].price.currency;
+  const subtotalCents = appointment.items.reduce(
+    (sum, item) => sum + toCents(item.price.amount),
+    0,
+  );
+
+  const coupon = couponCode
+    ? await resolveCoupon(admin, appointment.salon_id, couponCode, subtotalCents)
+    : null;
 
   const { data: order, error: orderError } = await admin
     .from("orders")
@@ -162,7 +192,8 @@ async function createOrderForAppointment(
       appointment_id: appointment.id,
       status: "awaiting_payment",
       currency,
-      discount_reason: couponCode ? `Coupon ${couponCode.toUpperCase()}` : null,
+      discount_amount: fromCents(coupon?.discountCents ?? 0),
+      discount_reason: coupon ? `Coupon ${coupon.code}` : null,
     })
     .select("id")
     .single<{ id: string }>();
@@ -191,6 +222,8 @@ async function createOrderForAppointment(
     return null;
   }
 
+  if (coupon) await recordRedemption(admin, coupon, order.id, appointment.client_id, currency);
+
   const { error: linkError } = await admin
     .from("appointments")
     .update({ order_id: order.id })
@@ -199,6 +232,87 @@ async function createOrderForAppointment(
   if (linkError) console.error("Could not link order to appointment", linkError);
 
   return order.id;
+}
+
+/**
+ * Prices a coupon against the order subtotal, mirroring
+ * `PRVPaymentsKit.PricingEngine.evaluate(coupon:subtotal:…)`: whole cents,
+ * banker's rounding on a percentage, a fixed amount clamped to the subtotal,
+ * and nothing at all below the minimum spend.
+ *
+ * `book_appointment` has already refused the booking if the code is unknown,
+ * inactive, outside its window, or exhausted, so a miss here means the coupon
+ * simply does not apply to this basket — the booking stands, at full price.
+ */
+async function resolveCoupon(
+  admin: ReturnType<typeof serviceClient>,
+  salonId: string,
+  couponCode: string,
+  subtotalCents: number,
+): Promise<AppliedCoupon | null> {
+  const wanted = couponCode.trim().toUpperCase();
+  if (wanted.length === 0) return null;
+
+  // `coupons` is unique on `(salon_id, upper(code))`, which PostgREST cannot
+  // filter on directly, so the salon's active codes are matched here instead.
+  const { data, error } = await admin
+    .from("coupons")
+    .select("id, code, discount_kind, discount_percent, discount_amount, minimum_spend_amount")
+    .eq("salon_id", salonId)
+    .eq("is_active", true);
+
+  if (error) {
+    console.error("Could not load coupons for salon", error);
+    return null;
+  }
+
+  const coupon = (data ?? [])
+    .map((row) => row as CouponRow)
+    .find((row) => row.code.trim().toUpperCase() === wanted);
+  if (!coupon) return null;
+
+  const minimumSpendCents = toCents(coupon.minimum_spend_amount);
+  if (minimumSpendCents > 0 && subtotalCents < minimumSpendCents) return null;
+
+  const rawCents = coupon.discount_kind === "percent"
+    ? percentageOfCents(subtotalCents, coupon.discount_percent ?? 0)
+    : Math.max(toCents(coupon.discount_amount), 0);
+  const discountCents = Math.min(rawCents, subtotalCents);
+
+  if (discountCents <= 0) return null;
+  return { id: coupon.id, code: wanted, discountCents };
+}
+
+/**
+ * Writes the redemption row. `coupons.redemption_count` is maintained by a
+ * trigger on this table, so an unrecorded redemption is an uncapped coupon —
+ * and a discount with no audit trail. If the row cannot be written the discount
+ * is withdrawn rather than left half-applied.
+ */
+async function recordRedemption(
+  admin: ReturnType<typeof serviceClient>,
+  coupon: AppliedCoupon,
+  orderId: string,
+  clientId: string,
+  currency: string,
+): Promise<void> {
+  const { error } = await admin.from("coupon_redemptions").insert({
+    coupon_id: coupon.id,
+    user_id: clientId,
+    order_id: orderId,
+    amount: fromCents(coupon.discountCents),
+    currency,
+  });
+
+  if (!error) return;
+
+  console.error("Could not record coupon redemption; withdrawing the discount", error);
+  const { error: revertError } = await admin
+    .from("orders")
+    .update({ discount_amount: fromCents(0), discount_reason: null })
+    .eq("id", orderId);
+
+  if (revertError) console.error("Could not withdraw the coupon discount", revertError);
 }
 
 /**
