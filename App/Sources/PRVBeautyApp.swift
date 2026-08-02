@@ -21,6 +21,10 @@ struct PRVBeautyApp: App {
                 .environment(router)
                 .environment(\.prvDependencies, dependencies)
                 .task { await restoreSession() }
+                .onOpenURL { url in
+                    guard let destination = DeepLinkHandler.route(for: url) else { return }
+                    router.open(destination.route, in: destination.tab)
+                }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active {
                         PRVLog.app.info("Scene became active")

@@ -1,0 +1,33 @@
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+!*.xcodeproj/project.pbxproj
+xcuserdata/
+DerivedData/
+build/
+*.xcuserstate
+*.xcscmblueprint
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# macOS
+.DS_Store
+
+# Supabase
+Backend/supabase/.branches/
+Backend/supabase/.temp/
+Backend/.env
+.env
+.env.local
+
+# Node (Edge Function tooling)
+node_modules/
+
+# Secrets — never commit
+*.p8
+*.p12
+*.mobileprovision
+Secrets.xcconfig

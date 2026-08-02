@@ -73,6 +73,9 @@ targets:
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
         ITSAppUsesNonExemptEncryption: false
+        CFBundleURLTypes:
+          - CFBundleURLName: com.prv.beauty.deeplink
+            CFBundleURLSchemes: [prvbeauty]
     entitlements:
       path: App/Sources/PRVBeauty.entitlements
       properties:
