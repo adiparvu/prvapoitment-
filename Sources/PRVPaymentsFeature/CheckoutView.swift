@@ -263,6 +263,7 @@ public struct CheckoutView: View {
             .padding(.top, PRVSpacing.sm)
         }
         .scrollIndicators(.hidden)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading your order")
     }
 

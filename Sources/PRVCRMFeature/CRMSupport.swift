@@ -307,6 +307,7 @@ struct ClientListSkeleton: View {
                 .prvGlassCard()
             }
         }
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading clients")
     }
 }
@@ -328,6 +329,7 @@ struct ClientDetailSkeleton: View {
             PRVSkeleton(height: 88, radius: PRVRadius.lg)
             PRVSkeleton(height: 160, radius: PRVRadius.lg)
         }
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading client")
     }
 }

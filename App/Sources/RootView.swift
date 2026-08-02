@@ -261,8 +261,8 @@ struct RouteDestinationView: View {
             SalonProfileView(salonID: id)
         case .professional(let id):
             ProfessionalProfileView(professionalID: id)
-        case .service(_, let salonID):
-            SalonProfileView(salonID: salonID)
+        case .service(let serviceID, let salonID):
+            SalonProfileView(salonID: salonID, linkedServiceID: serviceID)
         case .booking(let salonID, let serviceIDs):
             BookingFlowView(context: BookingContext(salonID: salonID, serviceIDs: serviceIDs))
         case .appointment(let id):
@@ -286,7 +286,7 @@ struct RouteDestinationView: View {
         case .notifications:
             NotificationCenterView()
         case .reviews(let salonID):
-            SalonProfileView(salonID: salonID)
+            SalonProfileView(salonID: salonID, section: .reviews)
         case .clientRecord(let id):
             ClientDetailView(clientID: id)
         case .settings:

@@ -127,6 +127,7 @@ struct SlotBoardView: View {
                 }
             }
         }
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading available times")
     }
 

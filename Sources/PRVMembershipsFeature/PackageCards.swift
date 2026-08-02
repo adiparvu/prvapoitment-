@@ -167,6 +167,7 @@ struct PackageCard: View {
                     PRVSkeleton(height: 38, radius: PRVRadius.sm)
                 }
             }
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel("Loading the included services")
 
         case .loaded(let services):

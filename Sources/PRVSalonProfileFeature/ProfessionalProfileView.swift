@@ -336,6 +336,7 @@ public struct ProfessionalProfileView: View {
             .padding(PRVSpacing.md)
         }
         .scrollDisabled(true)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading profile")
     }
 

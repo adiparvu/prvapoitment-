@@ -7,7 +7,10 @@ import PRVDesignSystem
 
 /// The salon profile's content sections, shown behind the sticky glass
 /// segmented control.
-enum SalonProfileSection: String, CaseIterable, Hashable, Sendable {
+///
+/// Public so callers outside the module — notably the app shell resolving a
+/// `.reviews(salonID:)` deep link — can open the profile on a chosen section.
+public enum SalonProfileSection: String, CaseIterable, Hashable, Sendable {
     case services
     case team
     case gallery
@@ -15,7 +18,7 @@ enum SalonProfileSection: String, CaseIterable, Hashable, Sendable {
     case reviews
 
     /// Segment label.
-    var title: String {
+    public var title: String {
         switch self {
         case .services: "Services"
         case .team: "Team"
@@ -67,9 +70,21 @@ final class SalonProfileModel {
     /// Transient feedback (review submitted, report received, errors).
     var toast: PRVToast?
 
-    /// Creates the model for one salon.
-    init(salonID: Salon.ID) {
+    /// A service the profile should surface on open, arriving from a
+    /// `.service(_:salonID:)` deep link. Pre-selected once services load, so
+    /// the booking bar already carries it.
+    private let linkedServiceID: SalonService.ID?
+
+    /// Creates the model for one salon, optionally opening on a given section
+    /// with one service already selected.
+    init(
+        salonID: Salon.ID,
+        section: SalonProfileSection = .services,
+        linkedServiceID: SalonService.ID? = nil
+    ) {
         self.salonID = salonID
+        self.section = section
+        self.linkedServiceID = linkedServiceID
     }
 
     // MARK: - Loading
@@ -88,6 +103,11 @@ final class SalonProfileModel {
             services = try await servicesTask.filter(\.isActive)
             professionals = try await professionalsTask
             reviews = try await reviewsTask.filter { $0.moderation != .removed }
+            // A service arriving from a deep link is selected once the menu is
+            // known, so the "Book Now" bar opens already carrying it.
+            if let linkedServiceID, services.contains(where: { $0.id == linkedServiceID }) {
+                selectedServiceIDs.insert(linkedServiceID)
+            }
             phase = .loaded
 
             await deps.salons.markViewed(salonID: salonID)

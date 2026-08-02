@@ -284,6 +284,7 @@ struct BookingLoadingView: View {
                 }
             }
         }
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading the salon's menu")
     }
 }

@@ -177,6 +177,7 @@ public struct PaymentMethodsView: View {
             Spacer()
         }
         .padding(PRVSpacing.md)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading your payment methods")
     }
 

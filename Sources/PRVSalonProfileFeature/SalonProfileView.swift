@@ -19,9 +19,24 @@ public struct SalonProfileView: View {
     @State private var model: SalonProfileModel
 
     /// Creates the profile for one salon. All dependencies come from the
-    /// environment; the initializer takes only the identifier by contract.
-    public init(salonID: Salon.ID) {
-        _model = State(initialValue: SalonProfileModel(salonID: salonID))
+    /// environment; the initializer takes only identifiers and the entry
+    /// point by contract.
+    /// - Parameters:
+    ///   - salonID: The salon to show.
+    ///   - section: The section to open on. A "see reviews" link passes
+    ///     `.reviews` so it lands on reviews rather than the service menu.
+    ///   - linkedServiceID: A service to pre-select, so a link to one service
+    ///     opens with it already in the booking bar.
+    public init(
+        salonID: Salon.ID,
+        section: SalonProfileSection = .services,
+        linkedServiceID: SalonService.ID? = nil
+    ) {
+        _model = State(initialValue: SalonProfileModel(
+            salonID: salonID,
+            section: section,
+            linkedServiceID: linkedServiceID
+        ))
     }
 
     public var body: some View {
@@ -166,6 +181,7 @@ public struct SalonProfileView: View {
             .padding(PRVSpacing.md)
         }
         .scrollDisabled(true)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Loading salon")
     }
 
