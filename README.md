@@ -6,6 +6,9 @@ clients, salons, freelancers, and enterprise beauty businesses.
 Built with SwiftUI for iOS 26+, designed in Apple's Liquid Glass language, and backed by
 an enterprise Supabase + Stripe platform.
 
+**21 modules · 260 Swift files · 61.5k lines · 293 unit tests · 208 SwiftUI previews ·
+8.4k lines of SQL and Edge Functions**
+
 ---
 
 ## What's inside
@@ -77,6 +80,29 @@ App (shell) ──▶ Feature modules ──▶ Domain kits ──▶ Models
 - **Offline-first** — repositories cache locally; mutations queue through the sync engine
 - **Security** — Face ID app lock, passkeys, Keychain sessions, Postgres RLS on every
   table, server-side payment intents, audit logging, GDPR export/erase
+  ([`docs/SECURITY.md`](docs/SECURITY.md))
+
+## Demo personas
+
+Demo builds cold-launch signed out, so the welcome screen, guest browsing, and both role
+experiences are all reachable. Pick a persona with a launch argument (Xcode scheme →
+Arguments, or `xcrun simctl launch`):
+
+```
+-PRVDemoPersona client    # premium client — client tab bar
+-PRVDemoPersona owner     # salon owner — business tab bar
+```
+
+## Deep links
+
+The `prvbeauty://` scheme is resolved against whichever tab set is on screen, so a link
+lands correctly for client and business users alike:
+
+```
+prvbeauty://salon/<uuid>              prvbeauty://appointment/<uuid>
+prvbeauty://booking/<uuid>?services=  prvbeauty://checkout/<uuid>
+prvbeauty://assistant                 prvbeauty://wallet | loyalty | giftcards
+```
 
 ## Design language
 
