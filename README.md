@@ -3,7 +3,7 @@
 **The operating system for the beauty industry** — one native Apple ecosystem connecting
 clients, salons, freelancers, and enterprise beauty businesses.
 
-Built with SwiftUI for iOS 26+, designed in Apple's Liquid Glass language, and backed by
+Built with SwiftUI for iOS 27+, designed in Apple's Liquid Glass language, and backed by
 an enterprise Supabase + Stripe platform.
 
 **21 modules · 260 Swift files · 61.5k lines · 293 unit tests · 208 SwiftUI previews ·
@@ -24,7 +24,7 @@ an enterprise Supabase + Stripe platform.
 
 ## Requirements
 
-- Xcode 26+ (iOS 26 SDK — Liquid Glass APIs)
+- Xcode 27+ (iOS 27 SDK — updated Liquid Glass, WWDC26 SwiftUI APIs)
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
 - [Supabase CLI](https://supabase.com/docs/guides/cli) for the backend (optional for demo mode)
 

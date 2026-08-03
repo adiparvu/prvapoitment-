@@ -4,9 +4,9 @@ name: PRVBeauty
 options:
   bundleIdPrefix: com.prv.beauty
   deploymentTarget:
-    iOS: "26.0"
+    iOS: "27.0"
   developmentLanguage: en
-  xcodeVersion: "26.0"
+  xcodeVersion: "27.0"
 
 settings:
   base:
@@ -16,7 +16,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     CURRENT_PROJECT_VERSION: 1
     MARKETING_VERSION: 1.0.0
-    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "27.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     SUPPORTS_MACCATALYST: NO
     ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES

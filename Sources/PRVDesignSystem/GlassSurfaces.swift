@@ -47,15 +47,14 @@ extension View {
         PRVGlassCard(radius: radius, padding: padding) { self }
     }
 
-    /// Applies the interactive Liquid Glass effect to a control, falling back
-    /// to a material fill when the runtime predates the Liquid Glass APIs.
-    @ViewBuilder
+    /// Applies the Liquid Glass effect to a control.
+    ///
+    /// `interactive` opts the surface into the reactive treatment — glass that
+    /// scales, bounces, and shimmers under touch — which suits controls but
+    /// not static chrome. The deployment target is iOS 27, so no availability
+    /// fallback is needed; the SDK renders the current Liquid Glass material.
     public func prvGlassEffect(interactive: Bool = false) -> some View {
-        if #available(iOS 26.0, *) {
-            self.glassEffect(interactive ? .regular.interactive() : .regular)
-        } else {
-            self.background(.ultraThinMaterial, in: Capsule())
-        }
+        glassEffect(interactive ? .regular.interactive() : .regular)
     }
 }
 

@@ -15,7 +15,7 @@ and Apple-aligned option.
 |--------------------|----------------------------------------------------------------|
 | UI                 | SwiftUI only (no UIKit unless technically unavoidable)         |
 | Language           | Swift 6, strict concurrency (`Sendable` everywhere)            |
-| Minimum OS         | iOS 26 (Liquid Glass APIs), forward-compatible with iOS 27     |
+| Minimum OS         | iOS 27 (Xcode 27 SDK — updated Liquid Glass, new toolbar and reorder APIs)     |
 | Architecture       | MV — Views + `@Observable` models/services (no VIPER/ViewModels-for-their-own-sake) |
 | State              | `@Observable`, `@State`, `@Environment`; unidirectional data flow |
 | Concurrency        | Swift Concurrency (`async/await`, actors); no GCD              |

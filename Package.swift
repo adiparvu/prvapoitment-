@@ -35,7 +35,7 @@ func testTarget(_ name: String, dependencies: [Target.Dependency]) -> Target {
 let package = Package(
     name: "PRVBeauty",
     defaultLocalization: "en",
-    platforms: [.iOS("26.0")],
+    platforms: [.iOS("27.0")],
     products: [
         .library(name: "PRVFoundation", targets: ["PRVFoundation"]),
         .library(name: "PRVModels", targets: ["PRVModels"]),
