@@ -9,6 +9,10 @@ import PRVDesignSystem
 /// certificates, a portfolio with before/after comparisons, reviews about
 /// this professional, and an availability preview with a
 /// "Book with {name}" call to action.
+///
+/// Like the salon profile it is hero-led: the navigation bar minimizes as
+/// the client scrolls into the portfolio, keeping only the pinned share
+/// action visible over the photography.
 public struct ProfessionalProfileView: View {
     @Environment(\.prvDependencies) private var deps
     @Environment(AppRouter.self) private var router
@@ -34,9 +38,35 @@ public struct ProfessionalProfileView: View {
         }
         .background(Color.prv.canvas)
         .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarPinnedTrailing) {
+                shareButton
+            }
+        }
         .task { await model.load(using: deps) }
+        .confirmationDialog("Report this review?", item: $model.reviewPendingReport) { review in
+            Button("Report Review", role: .destructive) {
+                model.report(review)
+            }
+            Button("Cancel", role: .cancel) {}
+        }
         .prvToast($model.toast)
+    }
+
+    // MARK: - Toolbar
+
+    /// The single action pinned to the trailing edge, so it stays reachable
+    /// while the rest of the navigation bar minimizes over the hero.
+    @ViewBuilder
+    private var shareButton: some View {
+        if let professional = model.professional {
+            ShareLink(item: model.shareText) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            .accessibilityLabel("Share \(professional.displayName)'s profile")
+        }
     }
 
     // MARK: - Loaded content
@@ -219,7 +249,7 @@ public struct ProfessionalProfileView: View {
 
     /// The professional's next three open slots; tapping one (or the CTA)
     /// heads into the booking flow for their salon.
-    @ViewBuilder
+    @ContentBuilder
     private func availabilityCard(_ professional: Professional) -> some View {
         if let salon = model.salon {
             PRVGlassCard {
@@ -269,7 +299,7 @@ public struct ProfessionalProfileView: View {
                             Task { await model.toggleLike(on: review, using: deps) }
                         },
                         onReport: {
-                            model.report(review)
+                            model.reviewPendingReport = review
                         }
                     )
                 }
@@ -279,7 +309,7 @@ public struct ProfessionalProfileView: View {
 
     // MARK: - Booking bar
 
-    @ViewBuilder
+    @ContentBuilder
     private func bookingBar(_ professional: Professional) -> some View {
         if let salon = model.salon {
             HStack(spacing: PRVSpacing.md) {

@@ -71,6 +71,13 @@ public struct HomeView: View {
         }
         .background(Color.prv.canvas)
         .scrollIndicators(.hidden)
+        // Home is one uninterrupted media scroll and it owns no navigation
+        // chrome: the greeting header is the title and travels with the
+        // content, so the bar carries only what the shell merges in (a guest's
+        // pinned "Sign In"). Minimizing on scroll-down lets the bar — and its
+        // scroll-edge glass — yield to the imagery, then bring the shell's
+        // action straight back on the way up.
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .prvAnimation(PRVMotion.gentle, value: model.hasLoadedOnce)
         .refreshable { await refresh() }
         .task(id: session.currentUser?.id) {
@@ -212,7 +219,11 @@ public struct HomeView: View {
 
     /// A horizontal rail of salon cards driven by one section phase.
     /// Empty rails disappear entirely instead of rendering a hole.
-    @ViewBuilder
+    ///
+    /// Built with `@ContentBuilder`: a five-case switch over nested rails,
+    /// instantiated three times in `body`, makes this the module's heaviest
+    /// type-check site.
+    @ContentBuilder
     private func salonRail(
         _ title: String,
         subtitle: String?,

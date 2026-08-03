@@ -51,20 +51,11 @@ public struct CRMView: View {
         .scrollIndicators(.hidden)
         .navigationTitle("Clients")
         .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                sortMenu
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    PRVHaptics.tap()
-                    isAddingClient = true
-                } label: {
-                    Image(systemName: "person.crop.circle.badge.plus")
-                }
-                .accessibilityLabel("New client")
-            }
-        }
+        .toolbar { toolbarContent }
+        // Search and the stat tiles sit at the top of the content and scroll
+        // with it; the book below them is the screen. Minimizing the bar on the
+        // way down hands those rows the height they want.
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .prvAnimation(PRVMotion.gentle, value: model.phase)
         .prvAnimation(PRVMotion.spring, value: model.sort)
         .refreshable { await refresh() }
@@ -85,6 +76,33 @@ public struct CRMView: View {
     }
 
     // MARK: - Toolbar
+
+    /// "New client" is the book's primary action and the empty states are the
+    /// only other place it appears, so it is pinned to the trailing edge and
+    /// stays reachable at every width and while the bar is minimized. Sorting
+    /// has no other home at all, so its menu takes high visibility priority and
+    /// is the last thing to fold away when the bar runs out of room.
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItemGroup {
+            sortMenu
+        }
+        .visibilityPriority(.high)
+
+        ToolbarItem(placement: .topBarPinnedTrailing) {
+            newClientButton
+        }
+    }
+
+    private var newClientButton: some View {
+        Button {
+            PRVHaptics.tap()
+            isAddingClient = true
+        } label: {
+            Image(systemName: "person.crop.circle.badge.plus")
+        }
+        .accessibilityLabel("New client")
+    }
 
     private var sortMenu: some View {
         Menu {

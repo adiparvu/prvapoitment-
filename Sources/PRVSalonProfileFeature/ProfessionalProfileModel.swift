@@ -30,12 +30,35 @@ final class ProfessionalProfileModel {
     private(set) var reviews: [Review] = []
     /// The professional's next bookable slots (up to three).
     private(set) var nextSlots: [TimeSlot] = []
+    /// The review whose abuse report is awaiting confirmation. Bound to the
+    /// profile's `.confirmationDialog(item:)`, so the dialog and its subject
+    /// are a single piece of state and a stray tap never files a report.
+    var reviewPendingReport: Review?
     /// Transient feedback (report received, errors).
     var toast: PRVToast?
 
     /// Creates the model for one professional.
     init(professionalID: Professional.ID) {
         self.professionalID = professionalID
+    }
+
+    /// Recommendation text for the profile's pinned share action: who the
+    /// professional is, where they work, and how they are rated. Empty until
+    /// the professional has loaded, which is also when the toolbar surfaces
+    /// the button.
+    var shareText: String {
+        guard let professional else { return "" }
+        var lines = ["\(professional.displayName) — \(professional.title)"]
+        if let salon {
+            lines.append("At \(salon.name), \(salon.address.oneLine)")
+        }
+        if professional.reviewCount > 0 {
+            lines.append(
+                "Rated \(ProfileFormatting.rating(professional.rating)) out of 5 from \(professional.reviewCount) reviews."
+            )
+        }
+        lines.append("Book on PRV Beauty.")
+        return lines.joined(separator: "\n")
     }
 
     /// Loads the professional, then their salon context, filtered reviews,
@@ -104,7 +127,8 @@ final class ProfessionalProfileModel {
         }
     }
 
-    /// Records an abuse report for a review and acknowledges it.
+    /// Records an abuse report for a review once the client has confirmed
+    /// it, and acknowledges it.
     func report(_ review: Review) {
         PRVLog.ui.info("Review reported: \(review.id.description, privacy: .public)")
         toast = .info("Thanks — our team will review this shortly.")

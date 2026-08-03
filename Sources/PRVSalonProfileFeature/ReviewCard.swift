@@ -11,6 +11,8 @@ struct ReviewCard: View {
     /// Name shown on the owner-response header, e.g. the salon name.
     let responderName: String
     let onToggleLike: () -> Void
+    /// Asks the enclosing screen to report this review. The screen confirms
+    /// the report before filing it, so this never acts on its own.
     let onReport: () -> Void
 
     var body: some View {

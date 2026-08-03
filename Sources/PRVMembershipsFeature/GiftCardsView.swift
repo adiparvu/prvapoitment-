@@ -189,8 +189,13 @@ public struct GiftCardsView: View {
 ///
 /// The code stays masked until asked for. A gift card *is* its code — anyone
 /// who reads it over your shoulder can spend it — so revealing is always an
-/// explicit act.
+/// explicit act, and it lasts only as long as the client is actually looking:
+/// the moment the window stops being the active one, the code re-masks itself.
 struct GiftCardWalletRow: View {
+    /// `false` while another window has the focus (Stage Manager, multi-window,
+    /// the app switcher) — a revealed code must not linger there.
+    @Environment(\.appearsActive) private var appearsActive
+
     /// The card to render.
     let card: GiftCard
     /// Badges the card the client just bought.
@@ -270,6 +275,11 @@ struct GiftCardWalletRow: View {
         .opacity(isDepleted ? 0.7 : 1)
         .prvAnimation(PRVMotion.quick, value: isRevealed)
         .prvAnimation(PRVMotion.quick, value: didCopy)
+        .onChange(of: appearsActive) { _, isActive in
+            // Revealing is a deliberate act in front of the person who owns
+            // the card. Hand the window over and the reveal is spent.
+            if !isActive { isRevealed = false }
+        }
     }
 
     private var codeRow: some View {

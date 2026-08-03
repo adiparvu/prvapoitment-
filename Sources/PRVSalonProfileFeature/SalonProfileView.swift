@@ -10,6 +10,10 @@ import PRVDesignSystem
 /// Reviews, and a floating glass "Book Now" bar that carries the client's
 /// service selection into the booking flow.
 ///
+/// The screen is deliberately hero-led: the navigation bar minimizes as the
+/// client scrolls down into the menu, keeping only the pinned share action —
+/// the one thing worth interrupting the imagery for.
+///
 /// Data flows exclusively through `@Environment(\.prvDependencies)`;
 /// cross-feature navigation goes through the shared `AppRouter`.
 public struct SalonProfileView: View {
@@ -52,12 +56,38 @@ public struct SalonProfileView: View {
         }
         .background(Color.prv.canvas)
         .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarPinnedTrailing) {
+                shareButton
+            }
+        }
         .task { await model.load(using: deps) }
         .sheet(isPresented: $model.isWritingReview) {
             WriteReviewSheet(model: model, salonName: model.salon?.name ?? "")
         }
+        .confirmationDialog("Report this review?", item: $model.reviewPendingReport) { review in
+            Button("Report Review", role: .destructive) {
+                model.report(review)
+            }
+            Button("Cancel", role: .cancel) {}
+        }
         .prvToast($model.toast)
+    }
+
+    // MARK: - Toolbar
+
+    /// The single action pinned to the trailing edge, so it stays reachable
+    /// while the rest of the navigation bar minimizes over the hero.
+    @ViewBuilder
+    private var shareButton: some View {
+        if let salon = model.salon {
+            ShareLink(item: model.shareText) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            .accessibilityLabel("Share \(salon.name)")
+        }
     }
 
     // MARK: - Loaded content
@@ -94,7 +124,7 @@ public struct SalonProfileView: View {
 
     /// The active section's content. Switching sections cross-fades with a
     /// gentle vertical settle.
-    @ViewBuilder
+    @ContentBuilder
     private func sectionContent(salon: Salon) -> some View {
         Group {
             switch model.section {

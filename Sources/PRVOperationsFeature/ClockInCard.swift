@@ -10,9 +10,13 @@ import PRVModels
 /// coordinate to the team repository, which validates it against the salon's
 /// geofence — a validated entry earns the shield badge. While on the clock the
 /// card runs a live stopwatch driven by a `TimelineView`, so only the numerals
-/// redraw each second.
+/// redraw each second — and only while this window is the active one.
 struct ClockInCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// `false` while another window has the focus (Stage Manager, multi-window,
+    /// the app switcher). A stopwatch that redraws every second is not
+    /// something a window nobody is looking at should be spending frames on.
+    @Environment(\.appearsActive) private var appearsActive
 
     /// The person the clock belongs to, or `nil` when the signed-in account
     /// isn't linked to an employment record.
@@ -145,16 +149,33 @@ struct ClockInCard: View {
         .accessibilityAddTraits(.isButton)
     }
 
-    /// The live stopwatch. Only this label re-renders every second.
+    /// The live stopwatch. Only this label re-renders every second — and only
+    /// while this window is the active one. Hand focus to another window and it
+    /// freezes at the elapsed time it had, then picks the timeline back up on
+    /// return; the entry itself is timestamped server-side, so nothing is lost.
+    ///
+    /// VoiceOver never reads it: the button's accessibility value already
+    /// speaks the elapsed time, and a value that changes every second would
+    /// interrupt itself.
+    @ViewBuilder
     private func elapsedLabel(since start: Date) -> some View {
-        TimelineView(.periodic(from: start, by: 1)) { context in
-            Text(OperationsFormat.stopwatch(context.date.timeIntervalSince(start)))
-                .font(.system(.subheadline, design: .rounded, weight: .bold))
-                .monospacedDigit()
-                .foregroundStyle(Color.prv.textOnAccent)
-                .contentTransition(reduceMotion ? .identity : .numericText())
+        if appearsActive {
+            TimelineView(.periodic(from: start, by: 1)) { context in
+                stopwatch(from: start, to: context.date)
+            }
+            .accessibilityHidden(true)
+        } else {
+            stopwatch(from: start, to: .now)
+                .accessibilityHidden(true)
         }
-        .accessibilityHidden(true)
+    }
+
+    private func stopwatch(from start: Date, to now: Date) -> some View {
+        Text(OperationsFormat.stopwatch(now.timeIntervalSince(start)))
+            .font(.system(.subheadline, design: .rounded, weight: .bold))
+            .monospacedDigit()
+            .foregroundStyle(Color.prv.textOnAccent)
+            .contentTransition(reduceMotion ? .identity : .numericText())
     }
 
     // MARK: Status

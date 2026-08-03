@@ -54,6 +54,9 @@ public struct MembershipsView: View {
         .scrollIndicators(.hidden)
         .navigationTitle("Memberships")
         .navigationBarTitleDisplayMode(.large)
+        // A long browse: the gradient plan cards get the whole screen once the
+        // client starts reading downwards, and the bar returns on the way back.
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .prvAnimation(PRVMotion.gentle, value: model.phase)
         .refreshable { await refresh() }
         .task(id: session.currentUser?.id) { await refresh() }
@@ -64,18 +67,16 @@ public struct MembershipsView: View {
                 model: model
             )
         }
+        // The subscription being cancelled *is* the presentation state, so
+        // there is no flag that can drift out of step with it.
         .confirmationDialog(
             "Cancel this membership?",
-            isPresented: cancellationDialogBinding,
-            titleVisibility: .visible,
-            presenting: cancellationTarget
+            item: $cancellationTarget
         ) { subscription in
             Button("Cancel Membership", role: .destructive) {
                 confirmCancellation(of: subscription)
             }
-            Button("Keep Membership", role: .cancel) {
-                cancellationTarget = nil
-            }
+            Button("Keep Membership", role: .cancel) {}
         } message: { subscription in
             Text("\(MembershipsFormatting.benefitsUntil(subscription.renewsAt)). After that it won't renew, and you can re-join at any time.")
         }
@@ -269,17 +270,6 @@ public struct MembershipsView: View {
 
     // MARK: - Bindings
 
-    /// Presents the cancellation dialog while a target is set, and clears the
-    /// target the moment the dialog goes away — however it goes away.
-    private var cancellationDialogBinding: Binding<Bool> {
-        Binding(
-            get: { cancellationTarget != nil },
-            set: { isPresented in
-                if !isPresented { cancellationTarget = nil }
-            }
-        )
-    }
-
     private var cycleBinding: Binding<PlanCycleFilter> {
         Binding(
             get: { model.cycleFilter },
@@ -316,6 +306,8 @@ public struct MembershipsView: View {
     }
 
     private func confirmCancellation(of subscription: MembershipSubscription) {
+        // The subscription arrives from the dialog, which has already released
+        // the target; clearing it again keeps the state unambiguous.
         cancellationTarget = nil
         Task { await model.cancel(subscription, using: deps) }
     }

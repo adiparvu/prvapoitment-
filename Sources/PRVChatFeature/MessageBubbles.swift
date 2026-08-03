@@ -227,6 +227,12 @@ struct MessageRow: View {
 
     /// Photo and video bubbles share their frame, caption strip, and tap
     /// behaviour; only the play badge differs.
+    ///
+    /// Built through `ContentBuilder`: a button wrapping an async image,
+    /// overlaid, clipped, captioned, and finally run through `BubbleChrome`
+    /// is the transcript's heaviest single expression, and it is instantiated
+    /// once per media message inside the timeline's `ForEach`.
+    @ContentBuilder
     private func mediaBubble(
         url: URL,
         caption: String?,

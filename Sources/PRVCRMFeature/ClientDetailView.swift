@@ -20,7 +20,9 @@ public struct ClientDetailView: View {
     @State private var tab: ClientDetailTab = .notes
     @State private var isAddingNote = false
     @State private var signingTarget: SigningTarget?
-    @State private var isConfirmingErasure = false
+    /// The record an erasure request is being confirmed for. The record *is*
+    /// the presentation state — there is no separate flag to keep in step.
+    @State private var erasureTarget: ClientRecord?
 
     private let clientID: ClientRecord.ID
 
@@ -77,17 +79,20 @@ public struct ClientDetailView: View {
                 await sign(target)
             }
         }
+        // Binding the prompt to the record lets it name the person whose file
+        // is about to be marked — the one thing an audited privacy action
+        // should never leave to memory — and it can no longer be raised for a
+        // client the screen has since failed to load.
         .confirmationDialog(
             "Request erasure of this client's data?",
-            isPresented: $isConfirmingErasure,
-            titleVisibility: .visible
-        ) {
+            item: $erasureTarget
+        ) { client in
             Button("Request erasure", role: .destructive) {
-                requestErasure()
+                requestErasure(for: client)
             }
             Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("The request is recorded on this file. Personal data is removed once statutory retention on bookings and invoices expires.")
+        } message: { client in
+            Text("The request is recorded on \(client.fullName)'s file. Personal data is removed once statutory retention on bookings and invoices expires.")
         }
         .prvToast($model.toast)
     }
@@ -107,7 +112,10 @@ public struct ClientDetailView: View {
         .padding(.top, PRVSpacing.xxl)
     }
 
-    @ViewBuilder
+    /// The whole record, top to bottom. Built with `@ContentBuilder`: five card
+    /// types plus the tabbed section, each generic over its own content, make
+    /// this the module's heaviest type-check site.
+    @ContentBuilder
     private func content(for client: ClientRecord) -> some View {
         ClientHeaderCard(client: client)
 
@@ -293,7 +301,7 @@ public struct ClientDetailView: View {
             Section {
                 Button("Request erasure", systemImage: "trash", role: .destructive) {
                     PRVHaptics.warning()
-                    isConfirmingErasure = true
+                    erasureTarget = model.client
                 }
             }
         } label: {
@@ -328,8 +336,13 @@ public struct ClientDetailView: View {
         }
     }
 
-    private func requestErasure() {
-        guard let actorID = session.currentUser?.id else { return }
+    /// Files the erasure request against the record the prompt was raised for.
+    ///
+    /// The model writes the audited note onto the client it currently holds;
+    /// passing the record here keeps the confirmed subject and the written
+    /// subject provably the same one.
+    private func requestErasure(for client: ClientRecord) {
+        guard let actorID = session.currentUser?.id, model.client?.id == client.id else { return }
         let deps = deps
         Task { await model.requestErasure(by: actorID, using: deps) }
     }

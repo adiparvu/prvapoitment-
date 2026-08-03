@@ -52,6 +52,10 @@ final class AppointmentsListModel {
 
     var scope: AppointmentScope = .upcoming
     var sheet: AppointmentSheetRoute?
+    /// The appointment a swipe-to-cancel is asking about. Bound to the list's
+    /// `.confirmationDialog(item:)`, so the prompt and its subject are a single
+    /// piece of state and a stray swipe can never cancel a visit on its own.
+    var appointmentPendingCancellation: Appointment?
     var toast: PRVToast?
 
     /// Deterministic fee/refund rules shared with the server.

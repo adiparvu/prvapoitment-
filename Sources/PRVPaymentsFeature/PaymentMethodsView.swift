@@ -5,7 +5,8 @@ import PRVModels
 import PRVNetworking
 
 /// Manage the payment methods vaulted for this client: see them, choose a
-/// default, remove one, and add another through Stripe's PCI-scoped sheet.
+/// default, remove one — by swipe or from the row's menu, always behind a
+/// confirmation — and add another through Stripe's PCI-scoped sheet.
 ///
 /// Nothing on this screen can hold a card number — the rows carry a brand, a
 /// masked suffix, and an expiry, which is everything the vault returns.
@@ -38,25 +39,19 @@ public struct PaymentMethodsView: View {
                 model.add(method)
             }
         }
+        // The pending method *is* the presentation state: there is no separate
+        // flag to keep in step, and the dialog can name the card it is about
+        // to remove.
         .confirmationDialog(
             "Remove this payment method?",
-            isPresented: removalBinding,
-            titleVisibility: .visible
-        ) {
-            Button("Remove", role: .destructive) { model.confirmRemoval() }
-            Button("Keep", role: .cancel) { model.methodPendingRemoval = nil }
-        } message: {
-            Text("You can add it again at any time. Nothing already paid is affected.")
+            item: $model.methodPendingRemoval
+        ) { method in
+            Button("Remove", role: .destructive) { model.confirmRemoval(of: method) }
+            Button("Keep", role: .cancel) {}
+        } message: { method in
+            Text("\(method.displayLabel) can be added again at any time. Nothing already paid is affected.")
         }
         .prvToast($model.toast)
-    }
-
-    /// Presents the confirmation whenever a removal is pending.
-    private var removalBinding: Binding<Bool> {
-        Binding(
-            get: { model.methodPendingRemoval != nil },
-            set: { if !$0 { model.methodPendingRemoval = nil } }
-        )
     }
 
     // MARK: - Content
@@ -77,6 +72,14 @@ public struct PaymentMethodsView: View {
                     VStack(spacing: PRVSpacing.xs) {
                         ForEach(model.methods) { method in
                             methodRow(method)
+                                .swipeActions {
+                                    Button(role: .destructive) {
+                                        model.requestRemoval(of: method)
+                                    } label: {
+                                        Label("Remove", systemImage: "trash")
+                                    }
+                                    .accessibilityLabel("Remove \(method.displayLabel)")
+                                }
                         }
                     }
 
@@ -87,6 +90,9 @@ public struct PaymentMethodsView: View {
                 .padding(.bottom, PRVSpacing.xxl)
             }
             .scrollIndicators(.hidden)
+            // These are glass cards in a plain scroll view, not List rows —
+            // the container is what lets them answer a swipe.
+            .swipeActionsContainer()
             .prvBottomBar { addCardButton }
         }
     }

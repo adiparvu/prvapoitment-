@@ -62,7 +62,10 @@ public struct SalonDashboardView: View {
         .navigationTitle("Dashboard")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            // Analytics is the dashboard's only outbound action and the only
+            // route to the deep-dive report, so it is pinned to the trailing
+            // edge and survives both the bar minimizing and a narrow width.
+            ToolbarItem(placement: .topBarPinnedTrailing) {
                 NavigationLink {
                     AnalyticsView()
                 } label: {
@@ -71,6 +74,10 @@ public struct SalonDashboardView: View {
                 .accessibilityLabel("Open detailed analytics")
             }
         }
+        // Eight sections of figures scroll past before this screen ends, and
+        // the period control that drives all of them lives in the content — so
+        // the navigation bar is the one piece of chrome that can step aside.
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .prvAnimation(PRVMotion.gentle, value: model.phase)
         .prvAnimation(PRVMotion.spring, value: model.period)
         .refreshable { await refresh() }

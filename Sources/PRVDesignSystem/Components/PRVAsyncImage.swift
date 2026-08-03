@@ -4,6 +4,10 @@ import SwiftUI
 /// shimmering placeholder while loading and a graceful symbol fallback on
 /// failure (or when the URL is `nil`).
 ///
+/// Bytes load through ``PRVImageStore/imageSession``, so revisiting a salon
+/// hero or gallery serves from the platform's HTTP image cache instead of the
+/// network.
+///
 /// The loaded image fills the proposed frame; callers own sizing and
 /// clipping:
 ///
@@ -40,7 +44,7 @@ public struct PRVAsyncImage: View {
         Group {
             if let url {
                 AsyncImage(
-                    url: url,
+                    request: URLRequest(url: url, cachePolicy: .returnCacheDataElseLoad),
                     transaction: Transaction(animation: reduceMotion ? nil : PRVMotion.gentle)
                 ) { phase in
                     switch phase {
@@ -57,6 +61,7 @@ public struct PRVAsyncImage: View {
                         placeholder
                     }
                 }
+                .asyncImageURLSession(PRVImageStore.imageSession)
             } else {
                 fallback
             }

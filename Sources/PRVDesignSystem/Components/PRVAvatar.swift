@@ -4,6 +4,11 @@ import SwiftUI
 /// initials on the brand gradient. Photo loading shows a shimmering circle;
 /// load failures fall back to initials so the avatar never looks broken.
 ///
+/// Photos load through ``PRVImageStore/imageSession``. Avatars are the most
+/// repeated image on the platform — the same faces recur down chat lists,
+/// team rosters, and client records — so serving them from the HTTP image
+/// cache keeps those screens instant.
+///
 /// ```swift
 /// PRVAvatar(name: professional.displayName, imageURL: professional.avatarURL, size: .large)
 /// ```
@@ -50,7 +55,9 @@ public struct PRVAvatar: View {
     public var body: some View {
         Group {
             if let imageURL {
-                AsyncImage(url: imageURL) { phase in
+                AsyncImage(
+                    request: URLRequest(url: imageURL, cachePolicy: .returnCacheDataElseLoad)
+                ) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -66,6 +73,7 @@ public struct PRVAvatar: View {
                         initialsView
                     }
                 }
+                .asyncImageURLSession(PRVImageStore.imageSession)
             } else {
                 initialsView
             }

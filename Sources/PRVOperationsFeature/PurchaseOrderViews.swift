@@ -118,7 +118,7 @@ struct PurchaseOrderCard: View {
 
 /// Builds a purchase order: pick a supplier, add lines from the catalogue, and
 /// send it. Line costs default to each product's stored cost price and stay
-/// editable for a supplier's current pricing.
+/// editable for a supplier's current pricing; a line swipes away once added.
 struct NewPurchaseOrderSheet: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -146,6 +146,9 @@ struct NewPurchaseOrderSheet: View {
             }
             .background(Color.prv.canvas)
             .scrollIndicators(.hidden)
+            // The order lines below are cards in this scroll view rather than
+            // `List` rows; the container is what lets each of them swipe away.
+            .swipeActionsContainer()
             .navigationTitle("New Order")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -310,33 +313,39 @@ struct NewPurchaseOrderSheet: View {
             } else {
                 VStack(spacing: PRVSpacing.xs) {
                     ForEach(Array(draft.lines.enumerated()), id: \.offset) { index, line in
-                        OperationsSwipeRow(
-                            deleteLabel: "Remove \(line.productName)",
-                            onDelete: { removeLine(at: index) }
-                        ) {
-                            HStack(alignment: .firstTextBaseline, spacing: PRVSpacing.xs) {
-                                Text("\(line.quantity)×")
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundStyle(Color.prv.accent)
-                                    .monospacedDigit()
-                                Text(line.productName)
-                                    .prvStyle(.subheadline)
-                                    .lineLimit(1)
-                                Spacer(minLength: PRVSpacing.xs)
-                                Text((line.unitCost * Decimal(line.quantity)).formatted)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(Color.prv.textPrimary)
-                                    .monospacedDigit()
+                        lineRow(line)
+                            .operationsDeleteAction("Remove \(line.productName)") {
+                                removeLine(at: index)
                             }
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel(
-                                "\(line.quantity) × \(line.productName), \((line.unitCost * Decimal(line.quantity)).formatted)"
-                            )
-                        }
                     }
                 }
             }
         }
+    }
+
+    /// One line on the draft order. The sheet's scroll view carries
+    /// `swipeActionsContainer()`, so the row swipes away without the builder
+    /// having to become a `List`.
+    private func lineRow(_ line: PurchaseOrder.Line) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: PRVSpacing.xs) {
+            Text("\(line.quantity)×")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(Color.prv.accent)
+                .monospacedDigit()
+            Text(line.productName)
+                .prvStyle(.subheadline)
+                .lineLimit(1)
+            Spacer(minLength: PRVSpacing.xs)
+            Text((line.unitCost * Decimal(line.quantity)).formatted)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.prv.textPrimary)
+                .monospacedDigit()
+        }
+        .operationsRowSurface()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(line.quantity) × \(line.productName), \((line.unitCost * Decimal(line.quantity)).formatted)"
+        )
     }
 
     // MARK: Actions

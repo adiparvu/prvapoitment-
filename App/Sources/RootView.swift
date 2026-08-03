@@ -113,7 +113,7 @@ private struct ClientExperienceView: View {
     var body: some View {
         TabView(selection: tabSelection) {
             ForEach(AppTab.clientTabs, id: \.self) { tab in
-                Tab(tab.title, systemImage: tab.symbolName, value: tab) {
+                Tab(tab.title, systemImage: tab.symbolName, value: tab, role: role(for: tab)) {
                     NavigationStack(path: pathBinding(for: tab)) {
                         clientRoot(for: tab)
                             .navigationDestination(for: AppRoute.self) { route in
@@ -131,10 +131,23 @@ private struct ClientExperienceView: View {
         }
     }
 
+    /// Discover carries the client tab bar's conversion path: finding a salon
+    /// is where every booking, payment, and loyalty award starts, and it is the
+    /// only tab a guest can act on without an account. It therefore takes the
+    /// featured `.prominent` placement; Home, Bookings, Chat, and Wallet are
+    /// peers that manage what Discover produced, so they stay unroled.
+    private func role(for tab: AppTab) -> TabRole? {
+        tab == .discover ? .prominent : nil
+    }
+
+    /// Sign In is pinned rather than merely trailing: this toolbar is merged
+    /// into whatever the feature root already contributes, and it is a guest's
+    /// only route back to the welcome screen. Pinning keeps it on the bar
+    /// instead of letting it collapse behind a feature's own items.
     @ToolbarContentBuilder
     private var guestToolbarContent: some ToolbarContent {
         if let endGuestBrowsing {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .topBarPinnedTrailing) {
                 Button("Sign In") {
                     PRVHaptics.tap()
                     endGuestBrowsing()
@@ -144,7 +157,9 @@ private struct ClientExperienceView: View {
         }
     }
 
-    @ViewBuilder
+    /// Every client feature root in one switch — the app's heaviest
+    /// type-check site, so it is built with `@ContentBuilder`.
+    @ContentBuilder
     private func clientRoot(for tab: AppTab) -> some View {
         switch tab {
         case .home: HomeView()
@@ -205,7 +220,10 @@ private struct BusinessExperienceView: View {
         }
     }
 
-    @ViewBuilder
+    /// Every business feature root in one switch — like its client
+    /// counterpart, built with `@ContentBuilder` to keep the shell's
+    /// type-check cost down.
+    @ContentBuilder
     private func businessRoot(for tab: AppTab) -> some View {
         switch tab {
         case .dashboard: SalonDashboardView()

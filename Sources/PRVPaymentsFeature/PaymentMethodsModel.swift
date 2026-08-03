@@ -32,7 +32,8 @@ final class PaymentMethodsModel {
 
     /// Whether the add-card sheet is presented.
     var isAddingCard = false
-    /// The method the client asked to remove, pending confirmation.
+    /// The method the client asked to remove. Setting it presents the
+    /// confirmation; SwiftUI clears it again when the dialog goes away.
     var methodPendingRemoval: SavedPaymentMethod?
     /// Transient feedback.
     var toast: PRVToast?
@@ -88,8 +89,12 @@ final class PaymentMethodsModel {
 
     /// Removes the confirmed method, promoting a new default when the removed
     /// one held that role.
-    func confirmRemoval() {
-        guard let method = methodPendingRemoval else { return }
+    ///
+    /// - Parameter method: The method the confirmation dialog was presenting.
+    ///   It is passed in rather than re-read from ``methodPendingRemoval``,
+    ///   which the item-bound dialog has already cleared by the time the
+    ///   destructive button fires.
+    func confirmRemoval(of method: SavedPaymentMethod) {
         methodPendingRemoval = nil
         methods.removeAll { $0.id == method.id }
         if method.isDefault, !methods.isEmpty {

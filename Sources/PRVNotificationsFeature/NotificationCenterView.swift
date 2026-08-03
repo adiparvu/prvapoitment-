@@ -126,40 +126,58 @@ public struct NotificationCenterView: View {
         .scrollDisabled(true)
     }
 
+    /// Bucket headers stay pinned as their rows scroll past — the same
+    /// orientation the plain `List` gave them — so a notification is never
+    /// read without knowing whether it landed today or a fortnight ago.
     private var feed: some View {
-        List {
-            ForEach(model.groups) { group in
-                Section {
-                    ForEach(group.items) { notification in
-                        Button {
-                            open(notification)
-                        } label: {
-                            NotificationRow(notification: notification)
-                        }
-                        .buttonStyle(.plain)
-                        .modifier(NotificationRowChrome())
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            if !notification.isRead {
-                                Button {
-                                    Task { await model.markRead(notification, using: deps) }
-                                } label: {
-                                    Label("Mark Read", systemImage: "envelope.open.fill")
-                                }
-                                .tint(Color.prv.accent)
+        ScrollView {
+            LazyVStack(spacing: PRVSpacing.xs, pinnedViews: [.sectionHeaders]) {
+                ForEach(model.groups) { group in
+                    Section {
+                        ForEach(group.items) { notification in
+                            Button {
+                                open(notification)
+                            } label: {
+                                NotificationRow(notification: notification)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, PRVSpacing.md)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                markReadAction(for: notification)
                             }
                         }
+                    } header: {
+                        NotificationSectionHeader(group: group)
                     }
-                } header: {
-                    NotificationSectionHeader(group: group)
                 }
             }
+            .padding(.top, PRVSpacing.xxs)
+            .padding(.bottom, PRVSpacing.xxl)
         }
-        .listStyle(.plain)
-        .listSectionSeparator(.hidden)
-        .scrollContentBackground(.hidden)
+        // The feed is floating glass cards in a `LazyVStack`, not list rows:
+        // the scroll view itself hosts the swipe now, so swipe-to-mark-read
+        // survives without a `List` — and without the row-insets, row-
+        // background, separator, and minimum-height overrides it took to make
+        // a `List` look like this.
+        .swipeActionsContainer()
         .scrollIndicators(.hidden)
-        .environment(\.defaultMinListRowHeight, 0)
         .refreshable { await refresh() }
+    }
+
+    /// Swipe-to-clear, offered only while the notification is still unread.
+    /// Built through `ContentBuilder`: it is instantiated once per row inside
+    /// `ForEach`, so it type-checks on its own rather than as one expression
+    /// nested two `ForEach`es deep in the feed.
+    @ContentBuilder
+    private func markReadAction(for notification: PRVNotification) -> some View {
+        if !notification.isRead {
+            Button {
+                Task { await model.markRead(notification, using: deps) }
+            } label: {
+                Label("Mark Read", systemImage: "envelope.open.fill")
+            }
+            .tint(Color.prv.accent)
+        }
     }
 
     // MARK: - Empty surfaces

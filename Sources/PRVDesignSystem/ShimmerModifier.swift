@@ -5,13 +5,16 @@ import SwiftUI
 /// shape (text, blocks, avatars) shimmers within its own silhouette.
 ///
 /// Respects Reduce Motion: when enabled the view renders statically with no
-/// moving highlight.
+/// moving highlight. The sweep also stops in windows that aren't active
+/// (iPad multi-window and Stage Manager), so a background window never
+/// animates for attention it can't have — the placeholder simply rests.
 ///
 /// ```swift
 /// PRVSkeleton(height: 16).prvShimmer()
 /// ```
 public struct PRVShimmerModifier: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.appearsActive) private var appearsActive
     @State private var phase: CGFloat = -0.35
 
     private let isActive: Bool
@@ -26,7 +29,7 @@ public struct PRVShimmerModifier: ViewModifier {
     public func body(content: Content) -> some View {
         content
             .overlay {
-                if isActive && !reduceMotion {
+                if isActive && !reduceMotion && appearsActive {
                     LinearGradient(
                         gradient: Gradient(stops: [
                             .init(color: .clear, location: phase - 0.35),
@@ -53,7 +56,8 @@ public struct PRVShimmerModifier: ViewModifier {
 
 extension View {
     /// Applies the PRV loading shimmer while `active` is `true`.
-    /// Honors Reduce Motion by rendering statically.
+    /// Honors Reduce Motion by rendering statically, and pauses while the
+    /// window is inactive.
     public func prvShimmer(_ active: Bool = true) -> some View {
         modifier(PRVShimmerModifier(isActive: active))
     }

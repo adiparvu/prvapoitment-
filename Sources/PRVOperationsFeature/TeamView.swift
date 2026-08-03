@@ -44,6 +44,10 @@ public struct TeamView: View {
         .background(Color.prv.canvas)
         .navigationTitle("Studio")
         .navigationBarTitleDisplayMode(.large)
+        // The desk switcher is fixed chrome above three long working scrolls,
+        // so the bar is the only thing that can give them height back on the
+        // way down. The desks defer to the hub here — see `isEmbedded`.
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .prvAnimation(PRVMotion.morph, value: section)
     }
 }
@@ -77,6 +81,10 @@ struct TeamDeskView: View {
             .padding(.bottom, PRVSpacing.xxl)
         }
         .scrollIndicators(.hidden)
+        // The schedule board's shifts are cards in this scroll view, not `List`
+        // rows — the container is what lets them answer a swipe while the desk
+        // keeps its glass-card layout.
+        .swipeActionsContainer()
         .background(Color.prv.canvas)
         .refreshable { await refreshAll() }
         .task(id: rosterIdentity) { await loadRoster() }

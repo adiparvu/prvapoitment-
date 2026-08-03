@@ -48,6 +48,9 @@ public struct WalletView: View {
         .scrollIndicators(.hidden)
         .navigationTitle("Wallet")
         .navigationBarTitleDisplayMode(.large)
+        // The balance card is the headline; once the client scrolls past it
+        // into the ledger, the bar steps aside and comes back on the way up.
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .prvAnimation(PRVMotion.gentle, value: model.phase)
         .refreshable { await refresh() }
         .task(id: session.currentUser?.id) { await refresh() }

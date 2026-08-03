@@ -11,7 +11,9 @@ import PRVNetworking
 /// pickers), then read it three ways: a large scrubable chart with the previous
 /// window overlaid, a period-over-period comparison, and a cohort retention
 /// grid. Everything on screen can leave as a one-page PDF report or a CSV of the
-/// underlying series, both shared through `ShareLink`.
+/// underlying series, both shared through `ShareLink` — from the export card at
+/// the foot of the report, or from the navigation bar's overflow menu without
+/// scrolling there.
 public struct AnalyticsView: View {
     @Environment(\.prvDependencies) private var deps
     @Environment(UserSession.self) private var session
@@ -48,6 +50,11 @@ public struct AnalyticsView: View {
         .scrollIndicators(.hidden)
         .navigationTitle("Analytics")
         .navigationBarTitleDisplayMode(.large)
+        .toolbar { toolbarContent }
+        // Headline, chart, comparison, and cohort grid run several screens
+        // deep, while the metric chips and the range control above them never
+        // scroll away — so the bar is what gives the report the height.
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .prvAnimation(PRVMotion.gentle, value: model.phase)
         .prvAnimation(PRVMotion.spring, value: model.metric)
         .refreshable { await refresh() }
@@ -60,6 +67,64 @@ public struct AnalyticsView: View {
             .presentationBackground(.regularMaterial)
         }
         .prvToast($model.toast)
+    }
+
+    // MARK: - Toolbar
+
+    /// Both exports live in the bar's overflow menu. They are what the report
+    /// produces rather than part of reading it, which is exactly the priority
+    /// the overflow expresses — and until now the only way to reach them was to
+    /// scroll past every section to the card at the foot of the screen.
+    ///
+    /// The card stays, because it is where each artefact is explained; both
+    /// surfaces read the same prepared-file URLs, so they can never disagree
+    /// about whether something is ready to share.
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarOverflowMenu {
+            exportAction(
+                fileURL: model.pdfFileURL,
+                exportTitle: "Export PDF",
+                shareTitle: "Share PDF report",
+                systemImage: "doc.richtext",
+                action: exportPDF
+            )
+            exportAction(
+                fileURL: model.csvFileURL,
+                exportTitle: "Export CSV",
+                shareTitle: "Share CSV data",
+                systemImage: "tablecells",
+                action: { model.exportCSV() }
+            )
+        }
+    }
+
+    /// One export in the overflow menu: prepare the file, then share it — the
+    /// same two states the export card shows, driven by the same URL.
+    ///
+    /// Built with `@ContentBuilder`: a branch between a `ShareLink` and a
+    /// `Button`, instantiated twice, in a helper the toolbar re-evaluates on
+    /// every export.
+    @ContentBuilder
+    private func exportAction(
+        fileURL: URL?,
+        exportTitle: String,
+        shareTitle: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        if let fileURL {
+            ShareLink(item: fileURL) {
+                Label(shareTitle, systemImage: "square.and.arrow.up")
+            }
+            .accessibilityLabel(shareTitle)
+        } else {
+            Button(exportTitle, systemImage: systemImage) {
+                PRVHaptics.impact()
+                action()
+            }
+            .accessibilityHint("Prepares the file, then offers it for sharing")
+        }
     }
 
     // MARK: - Pickers

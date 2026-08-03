@@ -67,6 +67,10 @@ final class SalonProfileModel {
     private(set) var selectedAddOnIDs: [SalonService.ID: Set<ServiceAddOn.ID>] = [:]
     /// Whether the "Write a review" sheet is presented.
     var isWritingReview = false
+    /// The review whose abuse report is awaiting confirmation. Bound to the
+    /// profile's `.confirmationDialog(item:)`, so the dialog and its subject
+    /// are a single piece of state and a stray tap never files a report.
+    var reviewPendingReport: Review?
     /// Transient feedback (review submitted, report received, errors).
     var toast: PRVToast?
 
@@ -115,6 +119,27 @@ final class SalonProfileModel {
             PRVLog.ui.error("Salon profile load failed: \(String(describing: error), privacy: .public)")
             phase = .failed(ProfileFormatting.friendlyError(error, subject: "This salon"))
         }
+    }
+
+    // MARK: - Sharing
+
+    /// Recommendation text for the profile's pinned share action: who the
+    /// salon is, where to find them, and how they are rated. Empty until the
+    /// salon has loaded, which is also when the toolbar surfaces the button.
+    var shareText: String {
+        guard let salon else { return "" }
+        var lines = [salon.name]
+        if let tagline = salon.tagline {
+            lines.append(tagline)
+        }
+        lines.append(salon.address.oneLine)
+        if salon.reviewCount > 0 {
+            lines.append(
+                "Rated \(ProfileFormatting.rating(salon.rating)) out of 5 from \(salon.reviewCount) reviews."
+            )
+        }
+        lines.append("Book on PRV Beauty.")
+        return lines.joined(separator: "\n")
     }
 
     // MARK: - Service selection
@@ -230,8 +255,9 @@ final class SalonProfileModel {
         }
     }
 
-    /// Records an abuse report for a review. Moderation happens server-side;
-    /// here we acknowledge the report immediately.
+    /// Records an abuse report for a review once the client has confirmed it.
+    /// Moderation happens server-side; here we acknowledge the report
+    /// immediately.
     func report(_ review: Review) {
         PRVLog.ui.info("Review reported: \(review.id.description, privacy: .public)")
         toast = .info("Thanks — our team will review this shortly.")

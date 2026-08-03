@@ -51,6 +51,10 @@ struct AppointmentDetailView: View {
         .scrollIndicators(.hidden)
         .navigationTitle("Booking")
         .navigationBarTitleDisplayMode(.inline)
+        // Deep links land here from widgets, Live Activities, and push, and the
+        // screen is a single column of glass cards: once the reader is moving
+        // down it, the bar has nothing left to say.
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .refreshable { await refresh() }
         .task { await refresh() }
         .prvAnimation(PRVMotion.gentle, value: model.phase)

@@ -57,6 +57,8 @@ struct AppointmentActionButton: View {
 /// An upcoming visit: live countdown, status, what and with whom, and the
 /// three things clients actually do — move it, cancel it, or ask a question.
 struct UpcomingAppointmentCard: View {
+    @Environment(\.appearsActive) private var appearsActive
+
     let appointment: Appointment
     let salon: Salon?
     let isBusy: Bool
@@ -148,6 +150,14 @@ struct UpcomingAppointmentCard: View {
                                 .contentTransition(.numericText())
                         }
                     }
+                    // The countdown is the only thing on the card that keeps
+                    // moving, so it recedes while its window is inactive (iPad
+                    // multi-window and Stage Manager) — two PRV windows side by
+                    // side then tick in one place instead of competing. The
+                    // card's accessibility label still reads the countdown, so
+                    // VoiceOver is unaffected.
+                    .opacity(appearsActive ? 1 : 0.7)
+                    .prvAnimation(PRVMotion.gentle, value: appearsActive)
                 }
             }
 

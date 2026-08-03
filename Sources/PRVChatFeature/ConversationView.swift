@@ -164,7 +164,11 @@ public struct ConversationView: View {
         .padding(.top, PRVSpacing.xl)
     }
 
-    @ViewBuilder
+    /// One transcript row. Built through `ContentBuilder`: the message branch
+    /// resolves a whole `MessageContext` and an action set before it builds a
+    /// `MessageRow`, and it does so once per item inside the timeline's
+    /// `ForEach` — the screen's heaviest type-check site.
+    @ContentBuilder
     private func row(for item: ChatTimelineItem) -> some View {
         switch item {
         case .dayHeader(let header):

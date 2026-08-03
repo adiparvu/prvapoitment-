@@ -40,6 +40,11 @@ public struct ChatListView: View {
         .background(Color.prv.canvas)
         .navigationTitle("Messages")
         .toolbar { toolbarContent }
+        // The search field above the rows is fixed chrome, so the navigation
+        // bar is the only thing that can step aside: minimizing it on
+        // scroll-down hands a long thread list the screen back, and the one
+        // action that must survive is pinned rather than merely trailing.
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .task(id: session.currentUser?.id) { await refresh() }
         .prvToast($model.toast)
         .prvAnimation(PRVMotion.spring, value: model.searchText)
@@ -48,9 +53,15 @@ public struct ChatListView: View {
 
     // MARK: - Toolbar
 
+    /// The Assistant is pinned to the trailing edge. Its pinned row exists only
+    /// once the thread has loaded *and* survives the search filter, so while
+    /// the list is loading, empty, filtered to nothing, or failed, this button
+    /// is the only way in — and it has to outlive the bar minimizing on scroll.
+    /// "Mark All Read" is the lower-priority item: it appears only when there
+    /// is something to clear, and the swipe on each row already does its job.
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
+        ToolbarItem(placement: .topBarPinnedTrailing) {
             Button {
                 PRVHaptics.impact()
                 router.push(.beautyAssistant)
@@ -114,9 +125,9 @@ public struct ChatListView: View {
     }
 
     private var conversationList: some View {
-        List {
-            if model.showsAssistant, let assistant = model.assistantConversation {
-                Section {
+        ScrollView {
+            LazyVStack(spacing: PRVSpacing.xs) {
+                if model.showsAssistant, let assistant = model.assistantConversation {
                     Button {
                         PRVHaptics.impact()
                         router.push(.beautyAssistant)
@@ -124,11 +135,8 @@ public struct ChatListView: View {
                         AssistantConversationRow(conversation: assistant)
                     }
                     .buttonStyle(.plain)
-                    .modifier(ChatListRowChrome())
                 }
-            }
 
-            Section {
                 ForEach(model.filteredConversations) { conversation in
                     Button {
                         PRVHaptics.tap()
@@ -137,25 +145,39 @@ public struct ChatListView: View {
                         ConversationRow(conversation: conversation)
                     }
                     .buttonStyle(.plain)
-                    .modifier(ChatListRowChrome())
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        if conversation.unreadCount > 0 {
-                            Button {
-                                Task { await model.markRead(conversation, using: deps) }
-                            } label: {
-                                Label("Mark Read", systemImage: "envelope.open.fill")
-                            }
-                            .tint(Color.prv.accent)
-                        }
+                        markReadAction(for: conversation)
                     }
                 }
             }
+            .padding(.horizontal, PRVSpacing.md)
+            .padding(.top, PRVSpacing.xxs)
+            .padding(.bottom, PRVSpacing.xxl)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
+        // These threads are floating glass cards in a `LazyVStack`, not list
+        // rows: the scroll view itself hosts the swipe now, so the screen keeps
+        // swipe-to-mark-read without a `List` underneath it — and without the
+        // row-insets, row-background, separator, and minimum-height overrides
+        // it took to make that `List` look like this.
+        .swipeActionsContainer()
         .scrollIndicators(.hidden)
-        .environment(\.defaultMinListRowHeight, 0)
         .refreshable { await refresh() }
+    }
+
+    /// Swipe-to-clear, offered only while the thread actually has something
+    /// unread. Built through `ContentBuilder`: it is instantiated once per row
+    /// inside `ForEach`, so it type-checks on its own rather than as one
+    /// expression nested in the list body.
+    @ContentBuilder
+    private func markReadAction(for conversation: Conversation) -> some View {
+        if conversation.unreadCount > 0 {
+            Button {
+                Task { await model.markRead(conversation, using: deps) }
+            } label: {
+                Label("Mark Read", systemImage: "envelope.open.fill")
+            }
+            .tint(Color.prv.accent)
+        }
     }
 
     // MARK: - Empty surfaces
@@ -200,23 +222,6 @@ public struct ChatListView: View {
     /// MainActor-isolated refresh, callable from `@Sendable` refresh closures.
     private func refresh() async {
         await model.load(for: session.currentUser, using: deps)
-    }
-}
-
-// MARK: - Row chrome
-
-/// Strips the system list chrome so the glass rows float on the canvas.
-private struct ChatListRowChrome: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .listRowInsets(EdgeInsets(
-                top: PRVSpacing.xxs,
-                leading: PRVSpacing.md,
-                bottom: PRVSpacing.xxs,
-                trailing: PRVSpacing.md
-            ))
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
     }
 }
 

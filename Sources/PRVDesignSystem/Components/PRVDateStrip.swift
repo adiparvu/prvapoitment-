@@ -55,11 +55,15 @@ public struct PRVDateStrip: View {
         .prvAnimation(PRVMotion.quick, value: selection)
     }
 
+    /// Built through `ContentBuilder` so the cell's per-day state reads as
+    /// plain locals and the (deeply nested) label type-checks in isolation
+    /// rather than as one expression inside `ForEach`.
+    @ContentBuilder
     private func dayCell(for day: Date) -> some View {
         let isSelected = day.isSameDay(as: selection, calendar: calendar)
         let isToday = day.isSameDay(as: .now, calendar: calendar)
 
-        return Button {
+        Button {
             PRVHaptics.tap()
             selection = day
         } label: {

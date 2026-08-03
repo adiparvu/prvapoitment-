@@ -118,6 +118,10 @@ struct NotificationKindIcon: View {
 }
 
 /// Sticky header above each time bucket, with the bucket's unread count.
+///
+/// It pins to the top of the feed while its rows scroll underneath, so it
+/// carries its own canvas backdrop rather than letting glass cards slide
+/// through the words.
 struct NotificationSectionHeader: View {
     let group: NotificationGroup
 
@@ -139,8 +143,9 @@ struct NotificationSectionHeader: View {
 
             Spacer(minLength: 0)
         }
-        .textCase(nil)
-        .padding(.vertical, PRVSpacing.xxs)
+        .padding(.horizontal, PRVSpacing.md)
+        .padding(.vertical, PRVSpacing.xs)
+        .background(Color.prv.canvas)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             group.unreadCount > 0
@@ -196,21 +201,6 @@ struct NotificationErrorCard: View {
             }
             .frame(maxWidth: .infinity)
         }
-    }
-}
-
-/// Strips the system list chrome so the glass rows float on the canvas.
-struct NotificationRowChrome: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .listRowInsets(EdgeInsets(
-                top: PRVSpacing.xxs,
-                leading: PRVSpacing.md,
-                bottom: PRVSpacing.xxs,
-                trailing: PRVSpacing.md
-            ))
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
     }
 }
 

@@ -7,8 +7,9 @@ import PRVDesignSystem
 /// AI-forward discovery: a natural-language search field with a debounced
 /// (300 ms) structured search underneath, an inline "Ask AI" flow that
 /// renders Beauty Assistant recommendations as tappable cards, quick filter
-/// chips plus a full filter sheet driving `SalonSearchQuery`, a sort menu,
-/// and a MapKit map toggle with branded salon annotations.
+/// chips plus a full filter sheet driving `SalonSearchQuery`, and — in the
+/// navigation bar — a sort menu and the switch to a MapKit map with branded
+/// salon annotations.
 ///
 /// Data access goes exclusively through `@Environment(\.prvDependencies)`;
 /// cross-feature navigation through the shared `AppRouter`.
@@ -27,9 +28,6 @@ public struct DiscoverView: View {
         @Bindable var model = model
         VStack(spacing: 0) {
             VStack(spacing: PRVSpacing.sm) {
-                titleRow
-                    .padding(.horizontal, PRVSpacing.lg)
-
                 PRVSearchField(
                     text: $model.searchText,
                     prompt: "Try “I need bridal hair and makeup in June”"
@@ -52,6 +50,13 @@ public struct DiscoverView: View {
             content
         }
         .background(Color.prv.canvas)
+        .navigationTitle("Discover")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar { toolbarContent }
+        // The header stack above the results is fixed, so the bar is the only
+        // chrome that can step aside: minimizing it on scroll-down gives the
+        // image-led result cards the screen while search and filters stay put.
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .prvAnimation(PRVMotion.spring, value: model.assistantPhase)
         .prvAnimation(PRVMotion.gentle, value: model.isMapMode)
         .onChange(of: model.searchText) { _, _ in
@@ -65,16 +70,30 @@ public struct DiscoverView: View {
         }
     }
 
-    // MARK: - Header
+    // MARK: - Toolbar
 
-    private var titleRow: some View {
-        HStack(spacing: PRVSpacing.sm) {
-            Text("Discover")
-                .prvStyle(.largeTitle)
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: PRVSpacing.xs)
+    /// Sort and the list/map switch belong to the whole result set rather than
+    /// to any one row, so they sit in the navigation bar instead of spending a
+    /// line of fixed chrome above the results.
+    ///
+    /// The mode switch is pinned because map mode hides the list — and every
+    /// affordance on it — leaving this the only way back. Sort takes high
+    /// visibility priority since its menu is the only place to change ordering,
+    /// while filters keep their chip in the filter bar; on a narrow width, or
+    /// beside the shell's pinned guest "Sign In", those two survive first.
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItemGroup {
+            sortMenu
+        }
+        .visibilityPriority(.high)
+
+        ToolbarItem(placement: .topBarPinnedTrailing) {
+            mapToggle
         }
     }
+
+    // MARK: - Header
 
     /// The inline assistant surface under the search field: the "Ask AI"
     /// affordance when the query reads like a sentence, a thinking shimmer,
@@ -160,7 +179,8 @@ public struct DiscoverView: View {
         model.activeFilterCount > 0 ? "Filters · \(model.activeFilterCount)" : "Filters"
     }
 
-    /// Result count, in-flight indicator, sort menu, and the map toggle.
+    /// Result count and the in-flight indicator; sort and the map switch live
+    /// in the navigation bar.
     private var resultsHeader: some View {
         HStack(spacing: PRVSpacing.sm) {
             if let results = model.results {
@@ -175,12 +195,11 @@ public struct DiscoverView: View {
             }
 
             Spacer(minLength: PRVSpacing.xs)
-
-            sortMenu
-            mapToggle
         }
     }
 
+    /// Bar-hosted sort control: the label stays a plain `Label` because the
+    /// bar now supplies the Liquid Glass the old hand-rolled pill drew itself.
     private var sortMenu: some View {
         Menu {
             Picker("Sort by", selection: Binding(
@@ -192,17 +211,8 @@ public struct DiscoverView: View {
                 }
             }
         } label: {
-            HStack(spacing: PRVSpacing.xxs) {
-                Image(systemName: "arrow.up.arrow.down")
-                    .font(.caption.weight(.semibold))
-                Text(model.query.sort.displayName)
-                    .font(.footnote.weight(.semibold))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(Color.prv.textPrimary)
-            .padding(.vertical, PRVSpacing.xs)
-            .padding(.horizontal, PRVSpacing.sm)
-            .prvGlassEffect(interactive: true)
+            Label(model.query.sort.displayName, systemImage: "arrow.up.arrow.down")
+                .font(.footnote.weight(.semibold))
         }
         .accessibilityLabel("Sort by \(model.query.sort.displayName)")
     }
@@ -214,11 +224,7 @@ public struct DiscoverView: View {
         } label: {
             Image(systemName: model.isMapMode ? "list.bullet" : "map.fill")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(Color.prv.textPrimary)
-                .frame(width: 36, height: 36)
-                .prvGlassEffect(interactive: true)
         }
-        .buttonStyle(.plain)
         .accessibilityLabel(model.isMapMode ? "Show results as list" : "Show results on map")
     }
 

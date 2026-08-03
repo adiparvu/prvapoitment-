@@ -382,116 +382,72 @@ struct OperationsMeter: View {
     }
 }
 
+// MARK: - Row surface
+
+/// The opaque surface a swipeable card row sits on, so the action revealed
+/// behind it stays hidden until the row is dragged aside.
+private struct OperationsRowSurface: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(PRVSpacing.sm)
+            .background(Color.prv.surfaceElevated, in: PRVRadius.shape(PRVRadius.md))
+    }
+}
+
 // MARK: - Swipe to delete
 
-/// A swipe-to-delete row that works inside a `ScrollView` (SwiftUI's built-in
-/// `swipeActions` needs a `List`, which would fight the hub's card layout).
+/// The studio's destructive row action: a trailing swipe plus a context menu.
 ///
-/// Dragging left reveals a destructive button; VoiceOver users get the same
-/// action through an accessibility custom action, and everyone gets it through
-/// the row's context menu.
-struct OperationsSwipeRow<Content: View>: View {
-    private let deleteLabel: String
-    private let onDelete: () -> Void
-    private let onTap: (() -> Void)?
-    private let content: Content
+/// `swipeActions` no longer needs a `List`, so the hub's card rows answer a
+/// swipe natively and VoiceOver picks the action up on its own — the desks only
+/// have to say what the action *is*. The host scroll view must carry
+/// `swipeActionsContainer()` for the gesture to be recognized.
+///
+/// The context menu is kept alongside the swipe: it is the discoverable path
+/// for anyone who never tries the gesture, and it was already how the hub's
+/// rows behaved. Full swipe stays off — nothing on a rota or an order should be
+/// removed by an overshoot.
+private struct OperationsDeleteAction: ViewModifier {
+    let title: String
+    let perform: () -> Void
 
-    @State private var offset: CGFloat = 0
-
-    private let actionWidth: CGFloat = 84
-
-    /// Creates a swipeable row.
-    /// - Parameters:
-    ///   - deleteLabel: Accessible name for the destructive action.
-    ///   - onDelete: Performed when the destructive button is tapped.
-    ///   - onTap: Performed when the closed row is tapped. A tap on an open
-    ///     row always closes it instead, so the destructive action can't be
-    ///     triggered by a stray tap.
-    ///   - content: The row itself; it gets an opaque surface so the action
-    ///     stays hidden until revealed.
-    init(
-        deleteLabel: String = "Delete",
-        onDelete: @escaping () -> Void,
-        onTap: (() -> Void)? = nil,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.deleteLabel = deleteLabel
-        self.onDelete = onDelete
-        self.onTap = onTap
-        self.content = content()
+    func body(content: Content) -> some View {
+        content
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                deleteButton
+            }
+            .contextMenu {
+                deleteButton
+            }
     }
 
-    var body: some View {
-        ZStack(alignment: .trailing) {
-            Button {
-                PRVHaptics.warning()
-                close()
-                onDelete()
-            } label: {
-                Image(systemName: "trash.fill")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Color.prv.textOnAccent)
-                    .frame(width: actionWidth)
-                    .frame(maxHeight: .infinity)
-                    .background(Color.prv.danger)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(deleteLabel)
-            .opacity(offset < -2 ? 1 : 0)
-
-            content
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(PRVSpacing.sm)
-                .background(Color.prv.surfaceElevated)
-                .contentShape(Rectangle())
-                .offset(x: offset)
-                .gesture(drag)
-                .onTapGesture {
-                    if offset != 0 {
-                        close()
-                    } else if let onTap {
-                        PRVHaptics.tap()
-                        onTap()
-                    }
-                }
-        }
-        .clipShape(PRVRadius.shape(PRVRadius.md))
-        .prvAnimation(PRVMotion.spring, value: offset)
-        .accessibilityElement(children: .contain)
-        .accessibilityAction(named: Text(deleteLabel)) {
+    private var deleteButton: some View {
+        Button(role: .destructive) {
             PRVHaptics.warning()
-            onDelete()
+            perform()
+        } label: {
+            Label(title, systemImage: "trash")
         }
-        .contextMenu {
-            Button(role: .destructive) {
-                PRVHaptics.warning()
-                onDelete()
-            } label: {
-                Label(deleteLabel, systemImage: "trash")
-            }
-        }
+        .accessibilityLabel(title)
+    }
+}
+
+extension View {
+    /// Gives a card row the studio's opaque swipe surface.
+    func operationsRowSurface() -> some View {
+        modifier(OperationsRowSurface())
     }
 
-    private var drag: some Gesture {
-        DragGesture(minimumDistance: 14, coordinateSpace: .local)
-            .onChanged { value in
-                guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                offset = min(0, max(-actionWidth, value.translation.width))
-            }
-            .onEnded { value in
-                let shouldOpen = value.translation.width < -actionWidth / 2
-                    || value.predictedEndTranslation.width < -actionWidth
-                if shouldOpen {
-                    PRVHaptics.tap()
-                    offset = -actionWidth
-                } else {
-                    close()
-                }
-            }
-    }
-
-    private func close() {
-        offset = 0
+    /// Gives a card row the studio's destructive swipe and context-menu action.
+    /// - Parameters:
+    ///   - title: Accessible name for the action, e.g. `"Delete shift"`.
+    ///   - perform: Runs after the warning haptic, once the action is chosen.
+    func operationsDeleteAction(
+        _ title: String,
+        perform: @escaping () -> Void
+    ) -> some View {
+        modifier(OperationsDeleteAction(title: title, perform: perform))
     }
 }
 
@@ -546,11 +502,13 @@ struct OperationsSkeleton: View {
 
 // MARK: - Navigation chrome
 
-/// Applies a large navigation title only when the desk is running standalone.
+/// Applies the navigation bar's chrome only when the desk owns the bar.
 ///
 /// ``InventoryView`` and ``MarketingView`` are embedded inside ``TeamView``'s
 /// hub, and a title set on a descendant would override the hub's own — so when
-/// embedded they set none at all.
+/// embedded they set none at all and the hub decides how the bar behaves.
+/// Standalone they own both the title and the minimize behaviour, which keeps a
+/// desk identical either way round.
 private struct OperationsNavigationTitle: ViewModifier {
     let title: String
     let isEmbedded: Bool
@@ -563,12 +521,14 @@ private struct OperationsNavigationTitle: ViewModifier {
             content
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.large)
+                .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         }
     }
 }
 
 extension View {
-    /// Titles a desk when it is presented on its own.
+    /// Titles a desk, and lets its bar step aside on scroll, when the desk is
+    /// presented on its own rather than inside the hub.
     func operationsNavigationTitle(_ title: String, isEmbedded: Bool) -> some View {
         modifier(OperationsNavigationTitle(title: title, isEmbedded: isEmbedded))
     }

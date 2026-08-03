@@ -6,9 +6,9 @@ import PRVModels
 /// The week schedule board.
 ///
 /// A date strip pages through the seven days of the shown week; under it every
-/// team member gets a row with their shifts for that day. Rows swipe to delete
-/// and tap to edit, and managers get an inline add button per person. Weeks are
-/// paged with the chevrons, which reloads only the schedule.
+/// team member gets a row with their shifts for that day. Shift rows swipe to
+/// delete and tap to edit, and managers get an inline add button per person.
+/// Weeks are paged with the chevrons, which reloads only the schedule.
 struct ShiftBoardView: View {
     let model: TeamModel
     /// Whether the session holds `.manageTeam`; read-only staff still see the
@@ -126,7 +126,11 @@ struct ShiftBoardView: View {
 
     // MARK: Member rows
 
-    @ViewBuilder
+    /// One person's line on the board. Built with `@ContentBuilder`: a header
+    /// that branches on permission plus a nested `ForEach` of shift rows,
+    /// instantiated once per team member, makes this the board's heaviest
+    /// type-check site.
+    @ContentBuilder
     private func memberRow(_ member: TeamMember) -> some View {
         let shifts = model.shifts(for: member.id, on: model.selectedDay)
 
@@ -168,24 +172,37 @@ struct ShiftBoardView: View {
         .padding(.vertical, PRVSpacing.xxs)
     }
 
+    /// A shift on the board: tap to edit, swipe to remove.
+    ///
+    /// The row is a card in a `ScrollView` rather than a `List` row, and the
+    /// enclosing desk carries `swipeActionsContainer()` — which is what lets it
+    /// answer a swipe without the board surrendering its layout to a `List`.
     @ViewBuilder
     private func shiftRow(_ shift: Shift) -> some View {
         if canManage {
-            OperationsSwipeRow(
-                deleteLabel: "Delete shift",
-                onDelete: { delete(shift) },
-                onTap: { model.editShift(shift) }
-            ) {
-                shiftContent(shift, isEditable: true)
-            }
-            .accessibilityHint("Double tap to edit this shift")
-            .opacity(model.pendingShiftIDs.contains(shift.id) ? 0.5 : 1)
-            .allowsHitTesting(!model.pendingShiftIDs.contains(shift.id))
+            shiftContent(shift, isEditable: true)
+                .operationsRowSurface()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    PRVHaptics.tap()
+                    model.editShift(shift)
+                }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Double tap to edit this shift")
+                .operationsDeleteAction("Delete shift") { delete(shift) }
+                .opacity(isPending(shift) ? 0.5 : 1)
+                .allowsHitTesting(!isPending(shift))
         } else {
             shiftContent(shift, isEditable: false)
                 .padding(PRVSpacing.sm)
                 .background(Color.prv.surface, in: PRVRadius.shape(PRVRadius.md))
         }
+    }
+
+    /// Whether a save or delete for this shift is already in flight, in which
+    /// case the row dims and stops answering both taps and swipes.
+    private func isPending(_ shift: Shift) -> Bool {
+        model.pendingShiftIDs.contains(shift.id)
     }
 
     private func shiftContent(_ shift: Shift, isEditable: Bool) -> some View {

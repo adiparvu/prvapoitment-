@@ -47,6 +47,9 @@ public struct LoyaltyView: View {
         .scrollIndicators(.hidden)
         .navigationTitle("Rewards")
         .navigationBarTitleDisplayMode(.inline)
+        // Tier hero, streak, challenges, achievements — a long celebratory
+        // scroll that reads better without a bar hovering over it.
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .prvAnimation(PRVMotion.gentle, value: model.phase)
         .refreshable { await refresh() }
         .task(id: session.currentUser?.id) { await refresh() }

@@ -166,7 +166,11 @@ public struct BeautyAssistantView: View {
         .accessibilityElement(children: .contain)
     }
 
-    @ViewBuilder
+    /// One row of the assistant thread. Built through `ContentBuilder`: the
+    /// message branch resolves a `MessageContext` and an action set before it
+    /// builds a `MessageRow` — which for this screen is usually a full
+    /// recommendation card — once per item inside the thread's `ForEach`.
+    @ContentBuilder
     private func row(for item: ChatTimelineItem) -> some View {
         switch item {
         case .dayHeader(let header):
@@ -265,8 +269,15 @@ public struct BeautyAssistantView: View {
 // MARK: - Supporting views
 
 /// The assistant's identity mark: a breathing gradient orb with a sparkle.
+///
+/// The breath is the only perpetual motion on the screen — it runs for as
+/// long as the hero prompt is on show — so it rests while another window has
+/// the focus rather than pulsing for attention it cannot have.
 struct AssistantHeroMark: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// `false` while another window is the active one (iPad multi-window,
+    /// Stage Manager).
+    @Environment(\.appearsActive) private var appearsActive
 
     @State private var isBreathing = false
 
@@ -288,12 +299,17 @@ struct AssistantHeroMark: View {
         }
         .scaleEffect(isBreathing ? 1.03 : 0.97)
         .animation(breathing, value: isBreathing)
-        .onAppear { isBreathing = true }
+        // Driving the breath from the window's own active state both starts it
+        // on appear and settles the orb — unanimated, since `breathing` is
+        // `nil` by then — the moment the window steps into the background.
+        .onChange(of: appearsActive, initial: true) { _, isActive in
+            isBreathing = isActive
+        }
         .accessibilityHidden(true)
     }
 
     private var breathing: Animation? {
-        guard !reduceMotion else { return nil }
+        guard !reduceMotion, appearsActive else { return nil }
         return .easeInOut(duration: 2.4).repeatForever(autoreverses: true)
     }
 }

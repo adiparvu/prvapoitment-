@@ -47,6 +47,9 @@ public struct PackagesView: View {
         .scrollIndicators(.hidden)
         .navigationTitle("Packages")
         .navigationBarTitleDisplayMode(.large)
+        // Package cards are tall and gradient-headed; expanding one pushes the
+        // list well past a screen, so the bar yields on the way down.
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .prvAnimation(PRVMotion.gentle, value: model.phase)
         .refreshable { await refresh() }
         .task(id: session.currentUser?.id) { await refresh() }

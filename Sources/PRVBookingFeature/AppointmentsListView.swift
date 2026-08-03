@@ -1,4 +1,5 @@
 import SwiftUI
+import PRVBookingKit
 import PRVDesignSystem
 import PRVFoundation
 import PRVModels
@@ -41,6 +42,11 @@ public struct AppointmentsListView: View {
             .padding(.top, PRVSpacing.xs)
             .padding(.bottom, PRVSpacing.xxl)
         }
+        // Bookings are glass cards in a `LazyVStack`, not list rows, so the
+        // scroll view itself hosts swipe actions: every upcoming visit now
+        // carries the same actions its buttons do, one gesture away, without
+        // surrendering the card layout to a `List`.
+        .swipeActionsContainer()
         .background(Color.prv.canvas)
         .scrollIndicators(.hidden)
         .navigationTitle("Bookings")
@@ -48,6 +54,12 @@ public struct AppointmentsListView: View {
         .task(id: session.currentUser?.id) { await refresh() }
         .sheet(item: $model.sheet) { route in
             sheet(for: route)
+        }
+        .confirmationDialog(
+            "Cancel this appointment?",
+            item: $model.appointmentPendingCancellation
+        ) { appointment in
+            cancellationActions(for: appointment)
         }
         .prvToast($model.toast)
         .prvAnimation(PRVMotion.spring, value: model.scope)
@@ -84,7 +96,10 @@ public struct AppointmentsListView: View {
         }
     }
 
-    @ViewBuilder
+    /// One row of the list. Built with `@ContentBuilder`: a switch over two
+    /// cards that each take six closures, instantiated once per visit inside
+    /// `ForEach`, makes this the screen's heaviest type-check site.
+    @ContentBuilder
     private func card(for appointment: Appointment) -> some View {
         switch model.scope {
         case .upcoming:
@@ -101,6 +116,12 @@ public struct AppointmentsListView: View {
                 },
                 onMessage: { openConversation(for: appointment) }
             )
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                trailingActions(for: appointment)
+            }
+            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                messageAction(for: appointment)
+            }
         case .past:
             PastAppointmentCard(
                 appointment: appointment,
@@ -116,6 +137,71 @@ public struct AppointmentsListView: View {
                 onInvoice: { openInvoice(for: appointment) }
             )
         }
+    }
+
+    // MARK: - Swipe actions
+
+    /// Reschedule and cancel, mirroring the card's own buttons for clients who
+    /// reach for a swipe first. Full swipe stays off — neither moving nor
+    /// cancelling a visit should fire from an overshoot — and while a mutation
+    /// is in flight the row offers nothing, so a second request can never race
+    /// the first.
+    @ContentBuilder
+    private func trailingActions(for appointment: Appointment) -> some View {
+        if !model.isBusy(appointment) {
+            Button(role: .destructive) {
+                PRVHaptics.tap()
+                model.appointmentPendingCancellation = appointment
+            } label: {
+                Label("Cancel", systemImage: "xmark.circle")
+            }
+
+            Button {
+                PRVHaptics.tap()
+                model.sheet = AppointmentSheetRoute(kind: .reschedule, appointment: appointment)
+            } label: {
+                Label("Reschedule", systemImage: "calendar.badge.clock")
+            }
+            .tint(Color.prv.accent)
+        }
+    }
+
+    /// Messaging the salon is the one row action that costs nothing to trigger,
+    /// so it takes the leading edge and leaves the trailing edge to the two
+    /// that change a booking.
+    private func messageAction(for appointment: Appointment) -> some View {
+        Button {
+            PRVHaptics.tap()
+            openConversation(for: appointment)
+        } label: {
+            Label("Message", systemImage: "bubble.left.and.text.bubble.right")
+        }
+        .tint(Color.prv.accent)
+    }
+
+    /// The swipe-to-cancel prompt. Its destructive button carries the exact
+    /// fee — the same words the cancellation sheet's confirm button uses — so
+    /// money is never hidden behind a gesture, and whenever there is a fee the
+    /// full breakdown stays one tap away.
+    @ContentBuilder
+    private func cancellationActions(for appointment: Appointment) -> some View {
+        let assessment = model.cancellationAssessment(for: appointment)
+        let confirmTitle: String = assessment.isFree
+            ? "Cancel Appointment"
+            : "Cancel and Pay \(assessment.fee.formatted)"
+
+        Button(confirmTitle, role: .destructive) {
+            PRVHaptics.warning()
+            Task { await model.cancel(appointment, reason: nil, using: deps) }
+        }
+
+        if !assessment.isFree {
+            Button("Review Cancellation Terms…") {
+                model.sheet = AppointmentSheetRoute(kind: .cancel, appointment: appointment)
+            }
+        }
+
+        Button("Keep Appointment", role: .cancel) {}
     }
 
     @ViewBuilder
@@ -141,7 +227,10 @@ public struct AppointmentsListView: View {
 
     // MARK: - Sheets
 
-    @ViewBuilder
+    /// Built with `@ContentBuilder`: both branches are full sheets with their
+    /// own trailing closures, so they type-check on their own rather than as
+    /// one expression inside `.sheet(item:)`.
+    @ContentBuilder
     private func sheet(for route: AppointmentSheetRoute) -> some View {
         switch route.kind {
         case .reschedule:

@@ -9,10 +9,14 @@ import PRVModels
 /// slow specular sheen travelling across the surface.
 ///
 /// The sheen is the only decorative motion on the screen and is disabled entirely
-/// under Reduce Motion; the card is an opaque gradient rather than glass, so Reduce
-/// Transparency needs no separate fallback.
+/// under Reduce Motion, and hidden while the window is in the background; the card
+/// is an opaque gradient rather than glass, so Reduce Transparency needs no separate
+/// fallback.
 struct WalletBalanceCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// `false` while another window has the focus — decoration should not be
+    /// the brightest thing on an inactive screen.
+    @Environment(\.appearsActive) private var appearsActive
 
     let storeCredit: Money
     let points: Int
@@ -103,6 +107,8 @@ struct WalletBalanceCard: View {
             .offset(x: sheenPhase * geometry.size.width * 1.4)
             .blendMode(.plusLighter)
         }
+        .opacity(appearsActive ? 1 : 0)
+        .prvAnimation(PRVMotion.gentle, value: appearsActive)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
         .onAppear {

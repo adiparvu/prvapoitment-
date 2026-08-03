@@ -48,6 +48,10 @@ struct SalonScheduleView: View {
         .background(Color.prv.canvas)
         .scrollIndicators(.hidden)
         .navigationTitle("Calendar")
+        // A busy day runs far past one screen. The date strip and the summary
+        // scroll away with the content, so the title bar should go too and give
+        // the day book the full height.
+        .toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
         .refreshable { await refresh() }
         .task(id: taskIdentity) { await refresh() }
         .prvAnimation(PRVMotion.spring, value: model.day)

@@ -17,8 +17,14 @@ import SwiftUI
 ///         }
 ///     }
 /// ```
+///
+/// The bar is the loudest chrome on any screen, so it recedes while its
+/// window is inactive (iPad multi-window and Stage Manager) — two PRV windows
+/// side by side then show one obvious call to action instead of competing
+/// gradients. On iPhone the window is always active and nothing changes.
 public struct PRVBottomBar<Content: View>: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.appearsActive) private var appearsActive
 
     private let content: Content
 
@@ -43,6 +49,8 @@ public struct PRVBottomBar<Content: View>: View {
                     .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
             }
             .prvSoftShadow()
+            .opacity(appearsActive ? 1 : 0.7)
+            .prvAnimation(PRVMotion.gentle, value: appearsActive)
             .padding(.horizontal, PRVSpacing.md)
             .padding(.bottom, PRVSpacing.xs)
     }

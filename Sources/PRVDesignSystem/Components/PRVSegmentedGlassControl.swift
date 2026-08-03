@@ -64,9 +64,13 @@ public struct PRVSegmentedGlassControl<Option: Hashable>: View {
         .prvAnimation(PRVMotion.spring, value: selection)
     }
 
+    /// Built through `ContentBuilder` so the selection state reads as a plain
+    /// local and the segment type-checks on its own instead of as one
+    /// expression inside `ForEach`.
+    @ContentBuilder
     private func segment(for option: Option) -> some View {
         let isSelected = option == selection
-        return Button {
+        Button {
             PRVHaptics.tap()
             selection = option
         } label: {

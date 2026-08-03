@@ -37,7 +37,7 @@ struct ReviewsSectionView: View {
                             Task { await model.toggleLike(on: review, using: deps) }
                         },
                         onReport: {
-                            model.report(review)
+                            model.reviewPendingReport = review
                         }
                     )
                 }
