@@ -63,8 +63,10 @@ targets:
       path: App/Sources/Info.plist
       properties:
         CFBundleDisplayName: PRV Beauty
+        CFBundleLocalizations: [en, nl, fr]
         UILaunchScreen: {}
         UIBackgroundModes: [remote-notification, fetch, processing]
+        BGTaskSchedulerPermittedIdentifiers: [com.prv.beauty.refresh]
         NSFaceIDUsageDescription: Unlock PRV Beauty and confirm bookings with Face ID.
         NSLocationWhenInUseUsageDescription: Find the best salons and professionals near you.
         NSCameraUsageDescription: Capture looks, before & after photos, and chat media.
@@ -107,6 +109,7 @@ targets:
       path: App/Widgets/Info.plist
       properties:
         CFBundleDisplayName: PRV Beauty Widgets
+        CFBundleLocalizations: [en, nl, fr]
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:
@@ -116,6 +119,18 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.prv.beauty.app.widgets
+
+  PRVBeautyUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/PRVBeautyUITests
+    dependencies:
+      - target: PRVBeautyApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.prv.beauty.app.uitests
+        TEST_TARGET_NAME: PRVBeautyApp
 
 schemes:
   PRVBeauty:
@@ -131,5 +146,8 @@ schemes:
         - package: PRVBeauty/PRVBookingKitTests
         - package: PRVBeauty/PRVPaymentsKitTests
         - package: PRVBeauty/PRVLoyaltyKitTests
+        - package: PRVBeauty/PRVNetworkingTests
+        - package: PRVBeauty/PRVPersistenceTests
+        - PRVBeautyUITests
     archive:
       config: Release

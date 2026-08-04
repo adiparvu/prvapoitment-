@@ -75,9 +75,51 @@ extension APIClient {
 /// `salonId` (never `salonID`) and `galleryURLs` would encode as `gallery_ur_ls`
 /// (never `gallery_urls`).
 public enum JSONCoding {
+    /// Parses the timestamp shapes PostgREST actually emits.
+    ///
+    /// Foundation's `.iso8601` strategy rejects fractional seconds, but Postgres
+    /// renders `timestamptz` with microseconds for every column defaulted from
+    /// `now()` — `2026-08-04T09:15:32.481920+00:00`. Decoding a row with that
+    /// strategy throws, which would break every repository read. Edge Functions
+    /// and RPCs normalize to whole seconds, so both forms must parse, as must
+    /// the `+HH`, `+HHMM`, and `+HH:MM` offset spellings Postgres may use.
+    static func parseTimestamp(_ text: String) -> Date? {
+        // `ISO8601DateFormatter` wants `Z` or `+HH:MM`. Normalize the two other
+        // offset spellings Postgres uses — `+00` and `+0000` — before parsing.
+        var candidate = text
+        if candidate.range(of: #"[+-]\d{2}$"#, options: .regularExpression) != nil {
+            candidate += ":00"
+        } else if let compact = candidate.range(of: #"[+-]\d{4}$"#, options: .regularExpression) {
+            let offset = candidate[compact]
+            let split = offset.index(offset.startIndex, offsetBy: 3)
+            candidate.replaceSubrange(compact, with: "\(offset[..<split]):\(offset[split...])")
+        }
+
+        let optionSets: [ISO8601DateFormatter.Options] = [
+            [.withInternetDateTime, .withFractionalSeconds],
+            [.withInternetDateTime],
+        ]
+        for options in optionSets {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = options
+            if let date = formatter.date(from: candidate) { return date }
+        }
+        return nil
+    }
+
     public static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let text = try container.decode(String.self)
+            guard let date = parseTimestamp(text) else {
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Unrecognized timestamp: \(text)"
+                )
+            }
+            return date
+        }
         decoder.keyDecodingStrategy = .custom { codingPath -> any CodingKey in
             guard let last = codingPath.last else { return PRVAnyCodingKey(stringValue: "") }
             return PRVAnyCodingKey(stringValue: PRVKeyCase.toCamelCase(last.stringValue))

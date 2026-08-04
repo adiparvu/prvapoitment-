@@ -156,5 +156,91 @@ begin
         'an unrelated signed-in user reads no appointments, CRM records, or wallet rows');
 end $$;
 
+-- ---------------------------------------------------------------------------
+-- Availability under RLS: a client must be able to see that a slot is busy
+-- without being able to see whose booking it is.
+-- ---------------------------------------------------------------------------
+\echo 'availability without identity leakage'
+do $$
+declare
+    v_salon      uuid := '00000000-0000-0000-0001-000000000001';
+    v_busy_rows  bigint;
+    v_columns    text;
+begin
+    select count(*) into v_busy_rows
+      from salon_busy_intervals(v_salon, now() - interval '10 years', now() + interval '10 years');
+    perform tests.assert(v_busy_rows > 0,
+        'salon_busy_intervals reports the seeded bookings');
+
+    select string_agg(column_name, ',' order by column_name)
+      into v_columns
+      from information_schema.columns
+     where table_name = 'salon_busy_intervals';
+
+    perform tests.assert(
+        coalesce(v_columns, '') not like '%client%',
+        'salon_busy_intervals exposes no client column');
+
+    -- The whole point: a signed-in stranger sees the busy windows (so the app
+    -- can lay out slots) while still seeing none of the appointments.
+    set local role authenticated;
+    perform set_config('request.jwt.claim.sub', '99999999-9999-9999-9999-999999999999', true);
+    select count(*) into v_busy_rows
+      from salon_busy_intervals(v_salon, now() - interval '10 years', now() + interval '10 years');
+    reset role;
+    perform tests.assert(v_busy_rows > 0,
+        'a stranger can still compute availability, despite RLS hiding the rows');
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- Erasure: personal data goes, the books stay, and the constraint that keeps
+-- text messages non-empty is respected.
+-- ---------------------------------------------------------------------------
+\echo 'GDPR erasure keeps the books'
+do $$
+declare
+    v_user       uuid;
+    v_record     uuid;
+    v_scrubbed   integer;
+    v_identifying bigint;
+    v_orders_before bigint;
+    v_orders_after  bigint;
+begin
+    select user_id into v_user from client_records where user_id is not null limit 1;
+    perform tests.assert(v_user is not null, 'a linked client record exists to erase');
+
+    select id into v_record from client_records where user_id = v_user limit 1;
+    insert into client_notes (client_record_id, author_id, kind, text)
+    values (v_record, v_user, 'general', 'Prefers oat milk. Allergic to PPD.');
+
+    select count(*) into v_orders_before from orders;
+
+    v_scrubbed := pseudonymize_client_records(v_user);
+    perform tests.assert(v_scrubbed > 0, 'erasure reports the rows it scrubbed');
+
+    select count(*) into v_identifying
+      from client_records
+     where user_id = v_user
+        or (id = v_record and (email is not null or phone is not null
+            or cardinality(allergies) > 0 or cardinality(preferences) > 0));
+    perform tests.assert(v_identifying = 0,
+        'no identifying data survives on the erased client record');
+
+    perform tests.assert(
+        not exists (select 1 from client_notes where client_record_id = v_record),
+        'free-text notes are deleted outright');
+
+    select count(*) into v_orders_after from orders;
+    perform tests.assert(v_orders_before = v_orders_after,
+        'financial records are retained for accounting');
+
+    perform tests.assert(
+        not exists (
+            select 1 from messages
+             where content_kind = 'text' and coalesce(length(body), 0) = 0
+        ),
+        'redacted text messages still satisfy messages_text_has_body');
+end $$;
+
 \echo ''
 \echo 'All backend assertions passed.'

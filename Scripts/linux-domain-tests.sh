@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds and tests the platform-independent layer — PRVFoundation, PRVModels,
-# and the PRVBookingKit / PRVPaymentsKit / PRVLoyaltyKit domain engines — on
+# the PRVBookingKit / PRVPaymentsKit / PRVLoyaltyKit domain engines, and the
+# PRVNetworking wire layer including the live Supabase repositories — on
 # Linux, where no Apple SDK is available.
 #
 # Those targets are pure Foundation by design (ARCHITECTURE.md §3: kits contain
@@ -15,7 +16,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HARNESS="${ROOT}/.build-linux"
 
 MODULES=(PRVFoundation PRVModels PRVBookingKit PRVPaymentsKit PRVLoyaltyKit PRVPersistence PRVNetworking)
-TEST_MODULES=(PRVModelsTests PRVBookingKitTests PRVPaymentsKitTests PRVLoyaltyKitTests)
+TEST_MODULES=(PRVModelsTests PRVBookingKitTests PRVPaymentsKitTests PRVLoyaltyKitTests PRVNetworkingTests)
 
 # The harness symlinks the real sources, so it can never drift from what ships.
 rm -rf "${HARNESS}"
@@ -43,20 +44,26 @@ let package = Package(
         .target(name: "PRVPaymentsKit", dependencies: ["PRVFoundation", "PRVModels"], swiftSettings: settings),
         .target(name: "PRVLoyaltyKit", dependencies: ["PRVFoundation", "PRVModels"], swiftSettings: settings),
         .target(name: "PRVPersistence", dependencies: ["PRVFoundation", "PRVModels"], swiftSettings: settings),
-        // The repository contracts and the in-memory backend behind every
-        // preview and the demo build are pure Foundation. Dependencies.swift
-        // is excluded: its SwiftUI @Entry environment key needs an Apple SDK.
+        // The repository contracts, the in-memory backend behind every preview,
+        // and all thirteen live Supabase repositories are pure Foundation.
+        // Excluded: Dependencies.swift (its SwiftUI @Entry environment key needs
+        // an Apple SDK) and Supabase/LiveDependencies.swift (the composition
+        // root that extends the type Dependencies.swift declares).
         .target(
             name: "PRVNetworking",
             dependencies: ["PRVFoundation", "PRVModels"],
-            exclude: ["Dependencies.swift"],
-            sources: ["APIClient.swift", "Repositories.swift", "InMemoryBackend.swift", "WireKeys.swift"],
+            exclude: ["Dependencies.swift", "Supabase/LiveDependencies.swift"],
+            sources: [
+                "APIClient.swift", "Repositories.swift", "InMemoryBackend.swift", "WireKeys.swift",
+                "Supabase",
+            ],
             swiftSettings: settings
         ),
         .testTarget(name: "PRVModelsTests", dependencies: ["PRVModels"], swiftSettings: settings),
         .testTarget(name: "PRVBookingKitTests", dependencies: ["PRVBookingKit"], swiftSettings: settings),
         .testTarget(name: "PRVPaymentsKitTests", dependencies: ["PRVPaymentsKit"], swiftSettings: settings),
         .testTarget(name: "PRVLoyaltyKitTests", dependencies: ["PRVLoyaltyKit"], swiftSettings: settings),
+        .testTarget(name: "PRVNetworkingTests", dependencies: ["PRVNetworking", "PRVModels", "PRVFoundation"], swiftSettings: settings),
     ]
 )
 MANIFEST

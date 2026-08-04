@@ -11,10 +11,13 @@ import PRVPaymentsKit
 /// upcoming visit, and the sealed receipt once the charge lands.
 ///
 /// Card details never reach this screen. Apple Pay returns an encrypted token
-/// and saved methods are Stripe vault references; the charge itself is created
-/// server-side through `PaymentRepository.pay(orderID:method:amount:)`.
+/// and saved methods are Stripe vault references; the amount is priced by
+/// `create-payment-intent` and the order is marked paid by `stripe-webhook`.
+/// Everything between those two facts is ``PaymentServiceProtocol``'s job, and
+/// this view knows nothing about which implementation is behind it.
 public struct CheckoutView: View {
     @Environment(\.prvDependencies) private var deps
+    @Environment(\.prvPaymentService) private var paymentService
     @Environment(AppRouter.self) private var router
     @Environment(UserSession.self) private var session
 
@@ -44,7 +47,7 @@ public struct CheckoutView: View {
         .navigationTitle(model.paymentPhase.receipt == nil ? "Checkout" : "Receipt")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
-        .task { await model.load(for: session.currentUser, using: deps) }
+        .task { await model.load(for: session.currentUser, using: deps, paymentService: paymentService) }
         .sheet(isPresented: $model.isRedeemingGiftCard) {
             GiftCardRedeemSheet(model: model)
         }
@@ -183,7 +186,7 @@ public struct CheckoutView: View {
 
                 Button {
                     PRVHaptics.impact()
-                    Task { await model.pay(using: deps) }
+                    Task { await model.pay(using: deps, service: paymentService) }
                 } label: {
                     if model.paymentPhase.isProcessing {
                         ProgressView()
@@ -274,7 +277,7 @@ public struct CheckoutView: View {
             message: message,
             actionTitle: "Try Again"
         ) {
-            Task { await model.load(for: session.currentUser, using: deps) }
+            Task { await model.load(for: session.currentUser, using: deps, paymentService: paymentService) }
         }
         .frame(maxHeight: .infinity)
     }

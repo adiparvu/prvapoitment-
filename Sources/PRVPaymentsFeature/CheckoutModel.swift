@@ -22,7 +22,7 @@ enum CheckoutPaymentOption: Hashable, Identifiable, Sendable {
         }
     }
 
-    /// The kind sent to `PaymentRepository.pay(orderID:method:amount:)`.
+    /// The tender this option settles with, as the wallet ledger records it.
     var kind: PaymentMethodKind {
         switch self {
         case .applePay: .applePay
@@ -112,13 +112,17 @@ struct CheckoutReceipt: Hashable, Sendable {
 /// Screen model backing ``CheckoutView``.
 ///
 /// Owns the whole payment lifecycle: loading the order and the ways to pay,
-/// recomputing the total as the client tips or switches to a deposit, applying
-/// gift-card and store-credit balances, and finally charging — credits first,
-/// remainder on the chosen method — so the ledger mirrors what the client saw.
+/// recomputing the quote as the client tips or switches to a deposit, applying
+/// gift-card and store-credit balances, and handing the client's choices to
+/// the injected ``PaymentServiceProtocol``.
 ///
-/// All money arithmetic goes through `PRVPaymentsKit`, so the figure on the
-/// button is the figure the pricing engine, the salon terminal, and the
-/// backend all compute.
+/// All money arithmetic on this screen goes through `PRVPaymentsKit`, which is
+/// what puts a figure on the button before anyone taps it. That figure is a
+/// **quote**, not an instruction: the amount actually charged is recomputed
+/// server-side by `create-payment-intent` from the order's own lines, and the
+/// receipt below is built from the order as the backend holds it once
+/// `stripe-webhook` has settled it. The two arithmetics are written to agree;
+/// when they do not, the server wins and the drift is logged.
 @Observable
 @MainActor
 final class CheckoutModel {
@@ -178,7 +182,6 @@ final class CheckoutModel {
     private let pricing = PricingEngine()
     private let prepayment = PrepaymentCalculator()
     private let planner = PaymentPlanner()
-    private let applePay = ApplePayCoordinator()
 
     /// Creates the model for one order.
     init(orderID: Order.ID) {
@@ -189,12 +192,20 @@ final class CheckoutModel {
 
     /// Loads the order, the salon behind it, the client's saved methods, and
     /// their store-credit balance — concurrently. Safe to call again to retry.
-    func load(for user: User?, using deps: PRVDependencies) async {
+    ///
+    /// - Parameter paymentService: The stack that will settle this payment; it
+    ///   decides whether the Apple Pay row appears at all.
+    func load(
+        for user: User?,
+        using deps: PRVDependencies,
+        paymentService: any PaymentServiceProtocol
+    ) async {
         guard let user else {
             phase = .failed("Sign in to complete this payment.")
             return
         }
         phase = .loading
+        isApplePayAvailable = paymentService.supportsApplePay
         do {
             let order = try await deps.payments.order(id: orderID)
             self.order = order
@@ -396,68 +407,55 @@ final class CheckoutModel {
 
     // MARK: - Paying
 
-    /// Charges the payment: Apple Pay authorization first when it applies,
-    /// then credits, then the remainder on the selected method.
+    /// Settles the payment through the injected payment service.
     ///
-    /// Every leg posts through `PaymentRepository.pay(orderID:method:amount:)`
-    /// so the wallet ledger records each tender separately, exactly as the
-    /// receipt shows it.
-    func pay(using deps: PRVDependencies) async {
-        guard canPay, let order else { return }
-        let due = amountDueOnMethod
-        let option = selectedOption
-
-        if !due.isZero, option == .applePay {
-            paymentPhase = .processing("Waiting for Apple Pay…")
-            let outcome = await applePay.authorize(applePayRequest(for: due))
-            switch outcome {
-            case .authorized:
-                break
-            case .cancelled:
-                paymentPhase = .idle
-                return
-            case .unavailable(let message):
-                PRVHaptics.warning()
-                paymentPhase = .idle
-                toast = .warning(message)
-                return
-            }
-        }
-
-        paymentPhase = .processing("Securing your payment…")
-        var latest = order
-        var charged = Money.zero(currency)
+    /// The model's only job here is to state the client's choices — which
+    /// order, how much tip, which deposit level, which gift card, whether to
+    /// spend store credit, and how the remainder is paid — and to render what
+    /// comes back. It does not create charges, does not decide that a payment
+    /// succeeded, and never sees an instrument: the service asks the server for
+    /// a PaymentIntent, has it authorized in a system sheet, and reads the
+    /// order back once `stripe-webhook` has settled it.
+    ///
+    /// - Parameters:
+    ///   - deps: The repositories; the payment repository is what the service
+    ///     re-reads the order from.
+    ///   - service: The payment stack, injected through
+    ///     `EnvironmentValues.prvPaymentService`.
+    func pay(using deps: PRVDependencies, service: any PaymentServiceProtocol) async {
+        guard canPay, order != nil else { return }
+        let request = settlementRequest()
+        paymentPhase = .processing(PaymentProgress.preparing.message)
 
         do {
-            if !giftCardCredit.isZero {
-                latest = try await deps.payments.pay(orderID: orderID, method: .giftCard, amount: giftCardCredit)
-                charged = charged + giftCardCredit
-            }
-            if !storeCreditApplied.isZero {
-                latest = try await deps.payments.pay(orderID: orderID, method: .storeCredit, amount: storeCreditApplied)
-                charged = charged + storeCreditApplied
-            }
-            if !due.isZero, let option {
-                latest = try await deps.payments.pay(orderID: orderID, method: option.kind, amount: due)
-                charged = charged + due
+            let settlement = try await service.settle(request, orders: deps.payments) { step in
+                self.paymentPhase = .processing(step.message)
             }
 
-            self.order = latest
-            let invoice = await invoice(for: latest, using: deps)
+            order = settlement.order
+            let collected = settlement.totalCollected
+            let invoice = await invoice(for: settlement.order, using: deps)
             let receipt = CheckoutReceipt(
-                order: latest,
-                charged: charged,
-                cashback: cashback(on: charged),
-                points: latest.pointsEarned,
+                order: settlement.order,
+                charged: collected,
+                cashback: cashback(on: collected),
+                points: settlement.order.pointsEarned,
                 invoice: invoice,
-                giftCardCode: appliedGiftCard?.code
+                giftCardCode: settlement.giftCardApplied.isZero ? nil : appliedGiftCard?.code
             )
             PRVHaptics.success()
             paymentPhase = .succeeded(receipt)
+        } catch PaymentServiceError.cancelled {
+            // Backing out of a payment sheet is a decision, not a failure.
+            paymentPhase = .idle
+        } catch PaymentServiceError.applePayUnavailable(let message) {
+            PRVHaptics.warning()
+            paymentPhase = .idle
+            toast = .warning(message)
         } catch {
             PRVLog.payments.error("Payment failed: \(String(describing: error), privacy: .public)")
             PRVHaptics.error()
-            self.order = latest
+            await refreshOrder(using: deps)
             paymentPhase = .failed(PaymentsFormatting.paymentError(error))
         }
     }
@@ -468,35 +466,100 @@ final class CheckoutModel {
         paymentPhase = .idle
     }
 
-    /// The Apple Pay sheet contents for the amount being charged.
-    private func applePayRequest(for amount: Money) -> ApplePayRequest {
-        var lines: [ApplePayLine] = []
+    /// Re-reads the order after a failure.
+    ///
+    /// A payment can fail *after* part of it landed — a deposit that cleared
+    /// before the webhook timed out, a gift card the server already consumed —
+    /// so the screen is refreshed from the backend rather than left showing a
+    /// total that is no longer owed.
+    private func refreshOrder(using deps: PRVDependencies) async {
+        guard let latest = try? await deps.payments.order(id: orderID) else { return }
+        order = latest
+    }
+
+    /// The request handed to the payment service.
+    private func settlementRequest() -> PaymentSettlementRequest {
+        PaymentSettlementRequest(
+            orderID: orderID,
+            channel: paymentChannel,
+            merchantName: salon?.name ?? "PRV Beauty",
+            countryCode: salon?.address.country ?? "BE",
+            currency: currency,
+            tip: tipAmount,
+            prepaymentPercent: prepaymentPercent,
+            giftCardCode: appliedGiftCard?.code,
+            usesStoreCredit: usesStoreCredit,
+            savePaymentMethod: false,
+            summaryLines: summaryLines,
+            quotedAmountDue: amountDueOnMethod,
+            quotedGiftCardCredit: giftCardCredit,
+            quotedStoreCredit: storeCreditApplied
+        )
+    }
+
+    /// How the remainder of this payment reaches Stripe.
+    ///
+    /// When credits cover the whole amount nothing is charged at all, and the
+    /// server is asked to settle the order from the balances alone.
+    private var paymentChannel: PaymentChannel {
+        guard !amountDueOnMethod.isZero else { return .balancesOnly }
+        switch selectedOption {
+        case .some(.applePay): return .applePay
+        case .some(.saved(let method)): return .hostedCard(savedMethodID: method.id)
+        case .none: return .balancesOnly
+        }
+    }
+
+    /// The deposit level this payment represents, as the percentage of the
+    /// order it leaves covered — `nil` when the client is settling in full.
+    ///
+    /// A percentage rather than a figure because the salon publishes the levels
+    /// it accepts (`prepayment_policies.offered_percents`) and the server
+    /// rejects anything else: a client cannot invent a 5% deposit. Rounding is
+    /// banker's, matching `PRVPaymentsKit`, so the level quoted before the tap
+    /// is the level the server prices.
+    private var prepaymentPercent: Int? {
+        guard amountChoice == .deposit, let order else { return nil }
+        let total = order.total.amount
+        guard total > 0 else { return nil }
+        let covered = order.amountPaid.amount + depositAmount.amount
+        let level = NSDecimalNumber(decimal: (covered * 100 / total).rounded(scale: 0)).intValue
+        guard level > 0, level < 100 else { return nil }
+        return level
+    }
+
+    /// The itemization shown above the total in the Apple Pay sheet: every
+    /// order line, the discount, the tip being added now, and each balance
+    /// being spent before a card is touched.
+    private var summaryLines: [PaymentSummaryLine] {
+        var lines: [PaymentSummaryLine] = []
         if let order {
             for line in order.lines where line.kind != .tip {
-                lines.append(ApplePayLine(label: line.title, amount: line.total))
+                lines.append(PaymentSummaryLine(label: line.title, amount: line.total))
             }
             if !order.discount.isZero {
                 lines.append(
-                    ApplePayLine(
+                    PaymentSummaryLine(
                         label: order.discountReason ?? "Discount",
                         amount: Money(-order.discount.amount, currency)
                     )
                 )
             }
         }
-        if !tipAmount.isZero { lines.append(ApplePayLine(label: "Tip", amount: tipAmount)) }
+        if !tipAmount.isZero {
+            lines.append(PaymentSummaryLine(label: "Tip", amount: tipAmount))
+        }
         if !giftCardCredit.isZero {
-            lines.append(ApplePayLine(label: "Gift card", amount: Money(-giftCardCredit.amount, currency)))
+            lines.append(
+                PaymentSummaryLine(label: "Gift card", amount: Money(-giftCardCredit.amount, currency))
+            )
         }
         if !storeCreditApplied.isZero {
-            lines.append(ApplePayLine(label: "Store credit", amount: Money(-storeCreditApplied.amount, currency)))
+            lines.append(
+                PaymentSummaryLine(label: "Store credit", amount: Money(-storeCreditApplied.amount, currency))
+            )
         }
-        return ApplePayRequest(
-            merchantName: salon?.name ?? "PRV Beauty",
-            lines: lines,
-            total: amount,
-            countryCode: salon?.address.country ?? "BE"
-        )
+        return lines
     }
 
     /// The invoice for a settled order, once the backend has issued one.

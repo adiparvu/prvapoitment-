@@ -2,25 +2,30 @@ import Foundation
 import SwiftUI
 import PRVFoundation
 import PRVModels
+import PRVNetworking
 
 /// Why a card could not be vaulted.
-enum CardTokenizationError: Error, Hashable, Sendable {
-    /// The build has no Stripe publishable key, so no secure sheet can open.
+public enum CardTokenizationError: Error, Hashable, Sendable {
+    /// No card-vaulting gateway is wired into this build.
     case notConfigured
-    /// The PCI-scoped card sheet is not present in this build.
-    case handoffUnavailable
     /// The client backed out of the secure sheet.
     case cancelled
+    /// The secure sheet could not be presented, or closed with an error.
+    case presentationFailed(String)
+    /// Stripe accepted the card but the vaulted method could not be read back.
+    case vaultingFailed(String)
 
     /// Client-facing explanation.
-    var message: String {
+    public var message: String {
         switch self {
         case .notConfigured:
-            "Secure card entry isn't configured for this build. Add a card at the salon, or pay with Apple Pay."
-        case .handoffUnavailable:
-            "Secure card entry opens in Stripe's own sheet, which isn't available in this build. Apple Pay works today."
+            "Adding a card isn't set up in this build. Pay with Apple Pay, or add a card at the salon."
         case .cancelled:
             "Card entry was cancelled."
+        case .presentationFailed(let detail):
+            detail
+        case .vaultingFailed(let detail):
+            detail
         }
     }
 }
@@ -29,19 +34,18 @@ enum CardTokenizationError: Error, Hashable, Sendable {
 ///
 /// PRV Beauty is deliberately out of PCI scope: no view in this module has a
 /// text field for a card number, and no type here can hold one. A conforming
-/// tokenizer hands control to Stripe's own sheet, which collects the PAN,
+/// tokenizer hands control to Stripe's own page, which collects the PAN,
 /// vaults it, and returns nothing but a token plus the last four digits —
 /// which is exactly the shape of ``SavedPaymentMethod``.
 ///
-/// The app target injects a live implementation through
-/// `EnvironmentValues.prvCardTokenizer`; this module ships the honest default
-/// below.
-protocol CardTokenizer: Sendable {
-    /// Opens the secure card sheet and returns the vaulted method.
+/// Main-actor isolated because vaulting presents system UI.
+public protocol CardTokenizer: Sendable {
+    /// Opens the secure card page and returns the vaulted method.
     /// - Parameters:
     ///   - cardholderName: Non-sensitive metadata collected before the handoff.
     ///   - postalCode: Billing postcode, used for address verification.
     ///   - setAsDefault: Whether the vaulted card becomes the default method.
+    @MainActor
     func vaultCard(
         cardholderName: String,
         postalCode: String,
@@ -49,44 +53,107 @@ protocol CardTokenizer: Sendable {
     ) async throws -> SavedPaymentMethod
 }
 
-/// The default tokenizer: it refuses to collect card details itself.
+/// Vaults a card on Stripe's own hosted setup page — no SDK, no PAN in this
+/// process.
 ///
-/// It checks that the build carries a Stripe publishable key
-/// (`PRVStripePublishableKey` in the app's Info.plist) and then hands off to
-/// the PCI-scoped sheet. When that sheet is not part of the build — as in an
-/// SDK-free package build — it fails loudly rather than pretending to have
-/// vaulted anything, because a payment method that does not exist server-side
-/// is worse than no payment method at all.
-struct StripeCardTokenizer: CardTokenizer {
-    /// Info.plist key carrying the Stripe publishable key.
-    static let publishableKeyName = "PRVStripePublishableKey"
+/// The same shape as a hosted checkout, one step earlier in the client's life:
+///
+/// 1. `create-setup-intent` opens a Stripe SetupIntent for the signed-in
+///    customer and returns the hosted page that collects the card.
+/// 2. ``HostedCheckoutSession`` presents that page in
+///    `ASWebAuthenticationSession`, so the card is typed in a browser context
+///    this app cannot read, and Stripe redirects to `prvbeauty://card-return`
+///    when it is done.
+/// 3. `vaulted-payment-method` reads the resulting `saved_payment_methods` row
+///    back — brand, last four, expiry, default flag. The server is what decides
+///    a card was really vaulted; the redirect only says the browser closed.
+public struct HostedCardTokenizer: CardTokenizer {
+    private let gateway: any CardVaultGateway
 
-    /// The configured publishable key, when the build has one.
-    static var publishableKey: String? {
-        guard let raw = Bundle.main.object(forInfoDictionaryKey: publishableKeyName) as? String,
-              raw.hasPrefix("pk_")
-        else { return nil }
-        return raw
+    /// Builds the tokenizer over the card-vaulting Edge Functions.
+    public init(gateway: any CardVaultGateway) {
+        self.gateway = gateway
     }
 
-    /// Whether a secure card sheet could open at all in this build.
-    static var isConfigured: Bool { publishableKey != nil }
-
-    func vaultCard(
+    /// Runs the hosted setup flow and returns the vaulted method.
+    @MainActor
+    public func vaultCard(
         cardholderName: String,
         postalCode: String,
         setAsDefault: Bool
     ) async throws -> SavedPaymentMethod {
-        guard Self.isConfigured else {
-            PRVLog.payments.notice("Card tokenization requested without a Stripe publishable key")
+        guard let returnURL = PaymentReturnURL.url(for: .card) else {
             throw CardTokenizationError.notConfigured
         }
-        throw CardTokenizationError.handoffUnavailable
+
+        let setup = try await gateway.createCardSetup(
+            CardSetupRequest(
+                cardholderName: cardholderName,
+                postalCode: postalCode,
+                setAsDefault: setAsDefault,
+                returnURL: returnURL
+            )
+        )
+
+        let hostedPage = HostedCheckoutSession()
+        switch await hostedPage.present(setup.hostedSetupURL) {
+        case .cancelled:
+            throw CardTokenizationError.cancelled
+        case .failed(let message):
+            throw CardTokenizationError.presentationFailed(message)
+        case .returned:
+            break
+        }
+
+        do {
+            return try await gateway.vaultedMethod(setupIntentID: setup.setupIntentID)
+        } catch APIError.notFound {
+            // The browser closed without Stripe confirming the setup — an
+            // abandoned page, a failed 3-D Secure step. Nothing was vaulted.
+            throw CardTokenizationError.vaultingFailed(
+                "That card wasn't saved. Try again, or use Apple Pay."
+            )
+        } catch {
+            PRVLog.payments.error("Could not read back the vaulted card: \(String(describing: error), privacy: .public)")
+            throw CardTokenizationError.vaultingFailed(
+                PaymentsFormatting.friendlyError(error, subject: "That card")
+            )
+        }
+    }
+}
+
+/// The tokenizer a build gets when no card-vaulting gateway has been injected.
+///
+/// It fails loudly rather than pretending to have vaulted anything: a payment
+/// method that does not exist server-side is worse than no payment method at
+/// all, because the client only discovers it at the till.
+public struct UnconfiguredCardTokenizer: CardTokenizer {
+    /// Creates the refusing tokenizer.
+    public init() {}
+
+    /// Always throws ``CardTokenizationError/notConfigured``.
+    @MainActor
+    public func vaultCard(
+        cardholderName: String,
+        postalCode: String,
+        setAsDefault: Bool
+    ) async throws -> SavedPaymentMethod {
+        PRVLog.payments.notice("Card vaulting requested with no gateway injected")
+        throw CardTokenizationError.notConfigured
     }
 }
 
 extension EnvironmentValues {
-    /// The card-vaulting boundary. Defaults to ``StripeCardTokenizer``; the
-    /// app target substitutes the SDK-backed implementation at its root.
-    @Entry var prvCardTokenizer: any CardTokenizer = StripeCardTokenizer()
+    /// The card-vaulting boundary.
+    ///
+    /// Defaults to ``UnconfiguredCardTokenizer``; the app root substitutes
+    /// ``HostedCardTokenizer`` alongside the live dependencies:
+    ///
+    /// ```swift
+    /// RootView()
+    ///     .environment(\.prvCardTokenizer, HostedCardTokenizer(
+    ///         gateway: EdgeFunctionPaymentGateway(functions: client)
+    ///     ))
+    /// ```
+    @Entry public var prvCardTokenizer: any CardTokenizer = UnconfiguredCardTokenizer()
 }

@@ -63,7 +63,7 @@ let package = Package(
         // ── Core ────────────────────────────────────────────────────────────
         target("PRVFoundation"),
         target("PRVModels", dependencies: ["PRVFoundation"]),
-        target("PRVDesignSystem", dependencies: ["PRVFoundation"]),
+        target("PRVDesignSystem", dependencies: ["PRVFoundation"], hasResources: true),
         target("PRVNetworking", dependencies: ["PRVFoundation", "PRVModels"]),
         target("PRVPersistence", dependencies: ["PRVFoundation", "PRVModels"]),
 
@@ -118,5 +118,7 @@ let package = Package(
         testTarget("PRVBookingKitTests", dependencies: ["PRVBookingKit"]),
         testTarget("PRVPaymentsKitTests", dependencies: ["PRVPaymentsKit"]),
         testTarget("PRVLoyaltyKitTests", dependencies: ["PRVLoyaltyKit"]),
+        testTarget("PRVNetworkingTests", dependencies: ["PRVNetworking", "PRVModels", "PRVFoundation"]),
+        testTarget("PRVPersistenceTests", dependencies: ["PRVPersistence", "PRVModels", "PRVFoundation"]),
     ]
 )

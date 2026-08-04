@@ -5,13 +5,13 @@ import PRVModels
 
 /// Adds a card — by handing off, not by collecting.
 ///
-/// This sheet is explicitly the **tokenization placeholder**: it gathers only
-/// the non-sensitive details that belong to PRV (who the card belongs to and
-/// the billing postcode used for address verification), explains where the
-/// card number actually goes, and then calls the injected ``CardTokenizer``.
-/// The card number is entered in Stripe's own PCI-scoped sheet, and only a
-/// vault token plus the last four digits ever come back — which is why no
-/// field on this screen accepts a PAN.
+/// The screen gathers only the non-sensitive details that belong to PRV (who
+/// the card belongs to, and the billing postcode used for address
+/// verification), explains where the card number actually goes, and then calls
+/// the injected ``CardTokenizer``. The number itself is typed on Stripe's own
+/// PCI-scoped page — presented by ``HostedCardTokenizer`` in a browser context
+/// this process cannot read — and only a vault token plus the last four digits
+/// ever come back, which is why no field on this screen accepts a PAN.
 struct AddCardSheet: View {
     @Environment(\.prvCardTokenizer) private var tokenizer
     @Environment(\.dismiss) private var dismiss
@@ -76,7 +76,7 @@ struct AddCardSheet: View {
                         .prvStyle(.headline)
                 }
 
-                Text("Tapping continue opens Stripe's own secure sheet. Your card number is entered there, vaulted by Stripe, and returned to PRV Beauty as a token — we only ever store the brand, the last four digits, and the expiry.")
+                Text("Tapping continue opens Stripe's own secure page. Your card number is entered there, vaulted by Stripe, and returned to PRV Beauty as a token — we only ever store the brand, the last four digits, and the expiry.")
                     .prvStyle(.subheadline)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -150,7 +150,7 @@ struct AddCardSheet: View {
         }
         .buttonStyle(.prvPrimary)
         .disabled(!canContinue)
-        .accessibilityLabel("Continue to Stripe's secure card sheet")
+        .accessibilityLabel("Continue to Stripe's secure card page")
     }
 
     private func failureBanner(_ message: String) -> some View {
