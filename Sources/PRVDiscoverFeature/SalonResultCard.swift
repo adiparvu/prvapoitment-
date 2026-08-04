@@ -76,6 +76,7 @@ struct SalonResultCard: View {
                         .buttonStyle(.prvPrimary)
                         .padding(.top, PRVSpacing.xs)
                         .accessibilityLabel("Book at \(salon.name)")
+                        .accessibilityIdentifier("discover.bookButton")
                     }
                     .padding(PRVSpacing.md)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -85,6 +86,7 @@ struct SalonResultCard: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilitySummary)
+        .accessibilityIdentifier("discover.salonCard")
     }
 
     private var imageHeader: some View {

@@ -77,6 +77,7 @@ public struct WalletView: View {
                 PRVHaptics.tap()
                 router.selectedTab = .discover
             }
+            .accessibilityIdentifier("wallet.guestState")
             .padding(.top, PRVSpacing.xxl)
         } else {
             VStack(alignment: .leading, spacing: PRVSpacing.xl) {
@@ -198,6 +199,7 @@ public struct WalletView: View {
     private var transactionsSection: some View {
         VStack(alignment: .leading, spacing: PRVSpacing.md) {
             PRVSectionHeader("Activity", subtitle: "Every movement on your wallet")
+                .accessibilityIdentifier("wallet.transactionsHeader")
 
             if model.months.isEmpty {
                 PRVEmptyState(

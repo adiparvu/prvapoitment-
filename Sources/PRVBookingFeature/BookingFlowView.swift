@@ -44,6 +44,7 @@ public struct BookingFlowView: View {
                 )
                 .padding(.horizontal, PRVSpacing.md)
                 .padding(.top, PRVSpacing.xs)
+                .accessibilityIdentifier("booking.progressBar")
             }
 
             ScrollView {
@@ -175,6 +176,7 @@ public struct BookingFlowView: View {
                     }
                     .buttonStyle(.prvGlass)
                     .accessibilityLabel("Back to \(model.step.previous?.shortTitle ?? "the previous step")")
+                    .accessibilityIdentifier("booking.backAction")
                 }
 
                 Button {
@@ -192,6 +194,7 @@ public struct BookingFlowView: View {
                 .disabled(!model.canAdvance)
                 .accessibilityLabel(model.primaryActionTitle)
                 .accessibilityHint(primaryActionHint)
+                .accessibilityIdentifier("booking.primaryAction")
             }
         }
         .prvAnimation(PRVMotion.spring, value: model.step)

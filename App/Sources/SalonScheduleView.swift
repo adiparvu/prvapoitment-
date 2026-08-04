@@ -162,6 +162,7 @@ private struct ScheduleRow: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens the booking")
+        .accessibilityIdentifier("schedule.row")
     }
 
     private var timeColumn: some View {

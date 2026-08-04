@@ -213,6 +213,7 @@ public struct ChatListView: View {
             title: "Sign in to message",
             message: "Conversations with your salon are end-to-end encrypted. Sign in to pick up where you left off."
         )
+        .accessibilityIdentifier("chat.guestState")
         .frame(maxHeight: .infinity, alignment: .top)
         .padding(.top, PRVSpacing.xl)
     }

@@ -134,6 +134,7 @@ struct ProfessionalSelectionStepView: View {
         }
         .accessibilityLabel(accessibilityLabel(for: professional))
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityIdentifier("booking.professionalRow")
     }
 
     private func accessibilityLabel(for professional: Professional) -> String {

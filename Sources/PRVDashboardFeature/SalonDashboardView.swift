@@ -72,6 +72,7 @@ public struct SalonDashboardView: View {
                     Image(systemName: "chart.xyaxis.line")
                 }
                 .accessibilityLabel("Open detailed analytics")
+                .accessibilityIdentifier("dashboard.analytics")
             }
         }
         // Eight sections of figures scroll past before this screen ends, and
@@ -205,6 +206,7 @@ public struct SalonDashboardView: View {
                     title: "A clear day",
                     message: "Nothing is booked today. A good moment to run a campaign or catch up on stock."
                 )
+                .accessibilityIdentifier("dashboard.emptyTimeline")
                 .prvGlassCard()
             } else {
                 TodayTimeline(

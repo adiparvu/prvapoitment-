@@ -178,6 +178,7 @@ public struct SalonProfileView: View {
             .buttonStyle(.prvPrimary)
             .frame(maxWidth: 150)
             .accessibilityLabel(bookAccessibilityLabel(salon: salon))
+            .accessibilityIdentifier("salonProfile.bookNow")
         }
         .prvAnimation(PRVMotion.quick, value: model.selectedCount)
     }

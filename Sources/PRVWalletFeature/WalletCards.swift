@@ -78,6 +78,7 @@ struct WalletBalanceCard: View {
         .prvSoftShadow()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Beauty Wallet, \(storeCredit.formatted) store credit, \(tier.displayName) member")
+        .accessibilityIdentifier("wallet.balanceCard")
     }
 
     private var tierBadge: some View {
@@ -163,6 +164,7 @@ struct WalletTransactionRow: View {
         .padding(.vertical, PRVSpacing.xxs)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilitySummary)
+        .accessibilityIdentifier("wallet.transactionRow")
     }
 
     private var accessibilitySummary: String {

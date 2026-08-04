@@ -52,6 +52,7 @@ struct LoyaltyTierHero: View {
             "\(tier.displayName) member, \(WalletFormatting.points(xp)) XP. \(progressCaption). "
                 + "\(WalletFormatting.points(points)) points to spend."
         )
+        .accessibilityIdentifier("loyalty.tierHero")
     }
 
     private var ring: some View {
@@ -159,6 +160,7 @@ struct DailyRewardCard: View {
             .disabled(hasClaimed || isClaiming)
             .accessibilityLabel(hasClaimed ? "Already claimed today" : "Claim today's reward")
             .accessibilityHint(hasClaimed ? "Available again tomorrow" : "Adds points and extends your streak")
+            .accessibilityIdentifier("loyalty.claimDaily")
         }
         .prvGlassCard(radius: PRVRadius.xl, padding: PRVSpacing.lg)
         .scaleEffect(isPulsing ? 1.03 : 1)

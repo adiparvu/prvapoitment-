@@ -70,6 +70,7 @@ public struct LoyaltyView: View {
                 PRVHaptics.tap()
                 router.selectedTab = .discover
             }
+            .accessibilityIdentifier("loyalty.guestState")
             .padding(.top, PRVSpacing.xxl)
         } else {
             VStack(alignment: .leading, spacing: PRVSpacing.xl) {

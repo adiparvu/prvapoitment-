@@ -51,6 +51,7 @@ struct AppointmentStatusPill: View {
         .background(status.dashboardTint.opacity(0.14), in: Capsule())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Status: \(status.displayName)")
+        .accessibilityIdentifier("dashboard.statusPill")
     }
 }
 
@@ -101,6 +102,7 @@ struct AppointmentTimelineRow: View {
         .padding(.vertical, PRVSpacing.xs)
         .contentShape(Rectangle())
         .prvAnimation(PRVMotion.spring, value: appointment.status)
+        .accessibilityIdentifier("dashboard.timelineRow")
     }
 
     // MARK: Rail
@@ -215,6 +217,7 @@ struct AppointmentTimelineRow: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("\(title) \(serviceSummary)")
+                    .accessibilityIdentifier("dashboard.advanceStatus")
                 }
 
                 if appointment.status.isActive {
@@ -235,6 +238,7 @@ struct AppointmentTimelineRow: View {
                             .contentShape(Rectangle())
                     }
                     .accessibilityLabel("More actions for \(serviceSummary)")
+                    .accessibilityIdentifier("dashboard.moreActions")
                 }
             }
         }

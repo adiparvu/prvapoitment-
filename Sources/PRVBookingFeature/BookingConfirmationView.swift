@@ -35,6 +35,7 @@ struct BookingConfirmationView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("booking.confirmation")
 
             detailsCard
             actions
@@ -182,6 +183,7 @@ struct BookingConfirmationView: View {
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(Color.prv.accent)
             .padding(.top, PRVSpacing.xxs)
+            .accessibilityIdentifier("booking.viewMyBookings")
         }
     }
 

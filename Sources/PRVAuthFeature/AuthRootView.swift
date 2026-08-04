@@ -94,6 +94,7 @@ public struct AuthRootView: View {
         .prvGlassCard(radius: PRVRadius.xl, padding: PRVSpacing.xl)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("PRV Beauty. Your beauty world, beautifully organized.")
+        .accessibilityIdentifier("welcome.root")
     }
 
     // MARK: - Value propositions
@@ -291,6 +292,7 @@ public struct AuthRootView: View {
             .buttonStyle(.prvGlass)
             .accessibilityLabel("Continue as guest")
             .accessibilityHint("Browse salons without an account. Booking, chat, and rewards stay locked.")
+            .accessibilityIdentifier("welcome.continueAsGuest")
 
             Text("Browse freely — booking, chat, and rewards unlock when you sign in.")
                 .prvStyle(.footnote)
@@ -362,11 +364,11 @@ struct GuestLimitsSheet: View {
                     .multilineTextAlignment(.center)
 
                 VStack(alignment: .leading, spacing: PRVSpacing.sm) {
-                    capabilityRow("sparkle.magnifyingglass", "Explore salons, artists, and prices", available: true)
-                    capabilityRow("star.fill", "Read verified reviews", available: true)
-                    capabilityRow("calendar.badge.clock", "Book appointments", available: false)
-                    capabilityRow("bubble.left.and.bubble.right.fill", "Chat with salons and the AI assistant", available: false)
-                    capabilityRow("crown.fill", "Earn loyalty rewards", available: false)
+                    capabilityRow("sparkle.magnifyingglass", "Explore salons, artists, and prices", slug: "browse", available: true)
+                    capabilityRow("star.fill", "Read verified reviews", slug: "reviews", available: true)
+                    capabilityRow("calendar.badge.clock", "Book appointments", slug: "booking", available: false)
+                    capabilityRow("bubble.left.and.bubble.right.fill", "Chat with salons and the AI assistant", slug: "chat", available: false)
+                    capabilityRow("crown.fill", "Earn loyalty rewards", slug: "rewards", available: false)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .prvGlassCard()
@@ -377,19 +379,29 @@ struct GuestLimitsSheet: View {
                 }
                 .buttonStyle(.prvPrimary)
                 .accessibilityHint("Continues without an account.")
+                .accessibilityIdentifier("guestSheet.startBrowsing")
 
                 Button("I'll sign in instead") {
                     dismiss()
                 }
                 .buttonStyle(.prvGlass)
+                .accessibilityIdentifier("guestSheet.signInInstead")
             }
             .padding(PRVSpacing.xl)
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .accessibilityIdentifier("guestSheet.root")
     }
 
-    private func capabilityRow(_ symbol: String, _ text: String, available: Bool) -> some View {
+    /// One capability in the guest list.
+    /// - Parameters:
+    ///   - symbol: SF Symbol illustrating the capability.
+    ///   - text: What the capability is, in the reader's language.
+    ///   - slug: Stable key for the capability, independent of its copy, so the
+    ///     row stays addressable once the copy is localized.
+    ///   - available: Whether guests already have it.
+    private func capabilityRow(_ symbol: String, _ text: String, slug: String, available: Bool) -> some View {
         HStack(spacing: PRVSpacing.sm) {
             Image(systemName: available ? "checkmark.circle.fill" : "lock.circle.fill")
                 .foregroundStyle(available ? Color.prv.success : Color.prv.textSecondary)
@@ -401,6 +413,7 @@ struct GuestLimitsSheet: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(text). \(available ? "Available as guest" : "Requires an account")")
+        .accessibilityIdentifier("guestSheet.locked.\(slug)")
     }
 }
 

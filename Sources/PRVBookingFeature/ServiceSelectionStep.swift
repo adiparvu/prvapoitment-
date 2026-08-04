@@ -63,6 +63,7 @@ struct BookingServiceRow: View {
                 .accessibilityLabel(accessibilityLabel)
                 .accessibilityHint(isSelected ? "Removes it from your booking" : "Adds it to your booking")
                 .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+                .accessibilityIdentifier("booking.serviceRow")
 
                 if !service.addOns.isEmpty {
                     Divider()

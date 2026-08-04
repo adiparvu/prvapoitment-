@@ -34,6 +34,7 @@ public struct DiscoverView: View {
                 ) {
                     model.searchNow(using: deps)
                 }
+                .accessibilityIdentifier("discover.searchField")
                 .padding(.horizontal, PRVSpacing.lg)
 
                 assistantRow
@@ -133,6 +134,7 @@ public struct DiscoverView: View {
                 ) {
                     model.isShowingFilters = true
                 }
+                .accessibilityIdentifier("discover.filtersChip")
 
                 PRVChip(
                     "Verified",
@@ -141,6 +143,7 @@ public struct DiscoverView: View {
                 ) {
                     model.toggleVerified(using: deps)
                 }
+                .accessibilityIdentifier("discover.verifiedChip")
 
                 PRVChip(
                     "4.5+",
@@ -149,6 +152,7 @@ public struct DiscoverView: View {
                 ) {
                     model.toggleMinRating(4.5, using: deps)
                 }
+                .accessibilityIdentifier("discover.ratingChip")
 
                 ForEach(SalonSearchQuery.AvailabilityWindow.quickChoices, id: \.self) { window in
                     PRVChip(
@@ -158,6 +162,7 @@ public struct DiscoverView: View {
                     ) {
                         model.setAvailability(window, using: deps)
                     }
+                    .accessibilityIdentifier("discover.availabilityChip.\(window.rawValue)")
                 }
 
                 ForEach(BusinessCategory.allCases, id: \.self) { category in
@@ -168,6 +173,7 @@ public struct DiscoverView: View {
                     ) {
                         model.toggleCategory(category, using: deps)
                     }
+                    .accessibilityIdentifier("discover.categoryChip.\(category.rawValue)")
                 }
             }
             .padding(.horizontal, PRVSpacing.lg)
@@ -187,6 +193,7 @@ public struct DiscoverView: View {
                 Text("^[\(results.count) place](inflect: true)")
                     .prvStyle(.headline)
                     .accessibilityLabel("\(results.count) results")
+                    .accessibilityIdentifier("discover.resultCount")
             }
             if model.isSearching {
                 ProgressView()
@@ -215,6 +222,7 @@ public struct DiscoverView: View {
                 .font(.footnote.weight(.semibold))
         }
         .accessibilityLabel("Sort by \(model.query.sort.displayName)")
+        .accessibilityIdentifier("discover.sortMenu")
     }
 
     private var mapToggle: some View {
@@ -226,6 +234,7 @@ public struct DiscoverView: View {
                 .font(.footnote.weight(.semibold))
         }
         .accessibilityLabel(model.isMapMode ? "Show results as list" : "Show results on map")
+        .accessibilityIdentifier(model.isMapMode ? "discover.listToggle" : "discover.mapToggle")
     }
 
     // MARK: - Content
@@ -290,6 +299,7 @@ public struct DiscoverView: View {
                 ) {
                     model.clearFilters(using: deps)
                 }
+                .accessibilityIdentifier("discover.emptyState")
                 .padding(.top, PRVSpacing.xl)
             } else {
                 if let message = model.errorMessage {

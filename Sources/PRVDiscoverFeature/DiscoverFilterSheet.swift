@@ -59,6 +59,7 @@ struct DiscoverFilterSheet: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .accessibilityIdentifier("discover.filterSheet")
     }
 
     // MARK: - Sections

@@ -70,6 +70,7 @@ struct SlotBoardView: View {
                             ) {
                                 onSelect(slot)
                             }
+                            .accessibilityIdentifier("booking.slot")
                         }
                     }
                 }
@@ -104,6 +105,7 @@ struct SlotBoardView: View {
                         ) {
                             onSelect(slot)
                         }
+                        .accessibilityIdentifier("booking.slot")
                     }
                 }
                 .padding(.vertical, 2)

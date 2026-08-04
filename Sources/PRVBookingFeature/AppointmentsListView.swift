@@ -90,6 +90,7 @@ public struct AppointmentsListView: View {
                     ForEach(model.visibleAppointments) { appointment in
                         card(for: appointment)
                             .transition(.opacity)
+                            .accessibilityIdentifier("appointments.row")
                     }
                 }
             }

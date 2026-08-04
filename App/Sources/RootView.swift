@@ -122,6 +122,10 @@ private struct ClientExperienceView: View {
                             .toolbar { guestToolbarContent }
                     }
                 }
+                // No `.accessibilityIdentifier` here: that modifier is declared
+                // on `View`, and `Tab` is `TabContent`. The UI suite selects
+                // tabs by their title, which is how XCUITest addresses a tab bar
+                // regardless.
             }
         }
         .sheet(item: sheetBinding) { route in
@@ -153,6 +157,7 @@ private struct ClientExperienceView: View {
                     endGuestBrowsing()
                 }
                 .accessibilityHint("Returns to the welcome screen to sign in or create an account.")
+                .accessibilityIdentifier("shell.signIn")
             }
         }
     }
@@ -211,6 +216,7 @@ private struct BusinessExperienceView: View {
                             }
                     }
                 }
+                // See the client tab bar: `Tab` is `TabContent`, not `View`.
             }
         }
         .sheet(item: sheetBinding) { route in
