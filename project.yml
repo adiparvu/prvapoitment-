@@ -8,6 +8,13 @@ options:
   developmentLanguage: en
   xcodeVersion: "27.0"
 
+# Base.xcconfig is committed and optionally includes the git-ignored
+# Config/Secrets.xcconfig, so a fresh clone builds with no setup and a
+# configured checkout picks up real credentials automatically.
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -79,6 +86,10 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: com.prv.beauty.deeplink
             CFBundleURLSchemes: [prvbeauty]
+        # Supplied by Config/Secrets.xcconfig, which is not committed. Left
+        # empty, the app composes the demo backend instead of the live one.
+        PRVSupabaseURL: $(PRV_SUPABASE_URL)
+        PRVSupabaseAnonKey: $(PRV_SUPABASE_ANON_KEY)
     entitlements:
       path: App/Sources/PRVBeauty.entitlements
       properties:

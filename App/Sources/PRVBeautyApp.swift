@@ -3,6 +3,7 @@ import SwiftUI
 import PRVFoundation
 import PRVModels
 import PRVNetworking
+import PRVPersistence
 
 @main
 struct PRVBeautyApp: App {
@@ -11,16 +12,48 @@ struct PRVBeautyApp: App {
     @State private var hasRestoredSession = false
     @Environment(\.scenePhase) private var scenePhase
 
-    // Demo mode ships with the in-memory backend; production wiring swaps in
-    // Supabase-backed repositories behind the same protocols.
-    private let dependencies: PRVDependencies = .inMemory()
+    /// Everything this launch talks to — live Supabase when the build carries
+    /// credentials, the seeded demo backend otherwise. See `AppComposition`.
+    private let composition = AppComposition()
+
+    private var dependencies: PRVDependencies { composition.dependencies }
+
+    init() {
+        // Must happen before the app finishes launching: BackgroundTasks
+        // rejects a handler registered any later.
+        registerBackgroundRefresh()
+    }
+
+    /// Registers the background refresh handler, when there is a queue to drain.
+    ///
+    /// Demo builds have no sync engine, so there is nothing to register — and
+    /// registering a handler that does nothing would only cost the user a wake.
+    private func registerBackgroundRefresh() {
+        guard let offline = composition.offline else { return }
+        // Captured by value: the handler runs on a queue BackgroundTasks owns,
+        // so it may close over nothing but Sendable values. `UserSession` is a
+        // @MainActor observable and deliberately not among them — the wake
+        // resolves the user from the persisted session instead, which is also
+        // the only correct answer when the app is not running.
+        let dependencies = composition.dependencies
+
+        let job = PRVBackgroundRefresh.Job(
+            sync: offline.sync,
+            cache: offline.cache,
+            refreshSnapshot: {
+                let user = await dependencies.auth.restoreSession()
+                await WidgetSyncService.refresh(using: dependencies, for: user)
+            }
+        )
+        _ = PRVBackgroundRefresh.register(job: job)
+    }
 
     var body: some Scene {
         WindowGroup {
             RootView(hasRestoredSession: hasRestoredSession)
                 .environment(session)
                 .environment(router)
-                .environment(\.prvDependencies, dependencies)
+                .prvComposition(composition)
                 .task { await restoreSession() }
                 .prvWidgetSync(session: session, dependencies: dependencies)
                 .onOpenURL { url in
@@ -30,8 +63,16 @@ struct PRVBeautyApp: App {
                     router.open(destination.route, in: destination.tab)
                 }
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .active {
+                    switch phase {
+                    case .active:
                         PRVLog.app.info("Scene became active")
+                    case .background:
+                        // Queue the next refresh as the app leaves the
+                        // foreground: BackgroundTasks only honours a request
+                        // that exists before the process is suspended.
+                        PRVBackgroundRefresh.schedule()
+                    default:
+                        break
                     }
                 }
         }

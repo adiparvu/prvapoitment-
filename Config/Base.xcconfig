@@ -1,0 +1,18 @@
+// PRV Beauty — base build configuration.
+//
+// Defines the settings the app reads at launch, with defaults that make a fresh
+// clone build and run immediately. Leaving the Supabase values empty is fully
+// supported: `AppComposition` then wires the seeded demo backend, so the app is
+// always runnable without a project behind it.
+//
+// To point a build at a real project, copy Config/Secrets.example.xcconfig to
+// Config/Secrets.xcconfig and fill it in. That file is git-ignored, and the
+// optional include below picks it up automatically — no edit to this file, and
+// no credential in version control.
+
+PRV_SUPABASE_URL =
+PRV_SUPABASE_ANON_KEY =
+
+// Optional by design: the leading `#include?` is silently skipped when the file
+// is absent, which is what keeps a fresh clone building.
+#include? "Secrets.xcconfig"
