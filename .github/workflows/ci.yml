@@ -62,7 +62,7 @@ jobs:
 
   backend:
     name: Validate backend
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -74,3 +74,12 @@ jobs:
       - name: Type-check Edge Functions
         working-directory: Backend/supabase/functions
         run: deno check **/index.ts
+
+      - name: Install PostgreSQL
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql
+
+      # Applies every migration to a throwaway database and asserts the two
+      # properties the platform cannot be wrong about: no double-booking, and
+      # no cross-tenant reads.
+      - name: Migrations, RLS, and booking assertions
+        run: Scripts/backend-tests.sh
