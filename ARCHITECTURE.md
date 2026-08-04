@@ -96,8 +96,24 @@ protocol. It is injected once at app root:
 @Environment(\.prvDependencies) private var deps
 ```
 
-Features resolve repositories from it. Live implementations are Supabase-backed;
-`InMemoryRepositories` power previews, tests, and offline demo mode.
+Features resolve repositories from it and cannot tell which backend is behind them.
+
+`AppComposition` (in the app target) is the only place that decides:
+
+| Backend | When | What it wires |
+|---|---|---|
+| **Live** | The build carries `PRV_SUPABASE_URL` + `PRV_SUPABASE_ANON_KEY` | `PRVDependencies.live(client:)` — thirteen Supabase repositories over a typed PostgREST client, a Keychain-persisted session, the SwiftData cache + sync engine, and server-settled payments |
+| **Demo** | No credentials, or `-PRVBackend demo` | `PRVDependencies.sharedInMemory` — the seeded `InMemoryBackend`, with no sync queue because its writes are already local |
+
+Credentials come from `Config/Base.xcconfig`, which optionally includes the git-ignored
+`Config/Secrets.xcconfig` — so a fresh clone builds with no setup and no credential is
+ever committed.
+
+`OfflineStack` is where `PRVPersistence` and `PRVNetworking` meet. The persistence module
+deliberately does not import networking, so the app target owns the `APIError` →
+`SyncSendResult` mapping: conflicts let the server-authoritative policy discard local
+booking and payment writes, unrecoverable failures drop the operation rather than block
+the queue, and only transient failures retry.
 
 ### 4.3 Feature root views (exact public API each feature MUST expose)
 

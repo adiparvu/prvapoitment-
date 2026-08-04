@@ -6,7 +6,7 @@ clients, salons, freelancers, and enterprise beauty businesses.
 Built with SwiftUI for iOS 27+, designed in Apple's Liquid Glass language, and backed by
 an enterprise Supabase + Stripe platform.
 
-**21 modules · 260 Swift files · 61.5k lines · 293 unit tests · 208 SwiftUI previews ·
+**21 modules · 306 Swift files · 78k lines · 363 unit tests · 208 SwiftUI previews ·
 8.4k lines of SQL and Edge Functions**
 
 ---
@@ -18,7 +18,7 @@ an enterprise Supabase + Stripe platform.
 | **Client app** | Home, AI-powered Discover, salon & professional profiles, multi-service booking with smart slot recommendations, waitlists, recurring & group bookings, checkout with Apple Pay, prepayment benefits, Beauty Wallet, loyalty (XP, tiers, streaks, challenges, referrals), memberships, packages, gift cards, encrypted chat, AI Beauty Assistant, notifications |
 | **Business app** | Salon dashboard with revenue analytics & forecasting, appointment timeline, CRM with beauty profiles / color formulas / consent forms, team scheduling & clock-in with GPS validation, payroll & goals, inventory with barcode scanning & purchase orders, marketing campaigns & coupons with AI suggestions, multi-location comparison |
 | **Domain kits** | `PRVBookingKit` (availability engine, schedule optimizer, cancellation rules, recurrence, waitlist matching), `PRVPaymentsKit` (pricing, VAT, prepayment quotes, refund rules, split payments), `PRVLoyaltyKit` (XP, tiers, streaks, referrals) — pure, deterministic, fully unit-tested |
-| **Platform** | Design system (Liquid Glass tokens + component library), typed domain models, repository-based data layer with offline-first sync contracts, DI via SwiftUI Environment, feature flags, structured logging |
+| **Platform** | Design system (Liquid Glass tokens + component library), typed domain models, thirteen live Supabase repositories behind a typed PostgREST client, SwiftData offline cache with a server-authoritative sync engine, DI via SwiftUI Environment, feature flags, structured logging |
 | **Widgets** | Next-appointment & loyalty widgets, booking Live Activity with Dynamic Island |
 | **Backend** | Supabase PostgreSQL schema with row-level security, transactional booking RPC, Stripe payment-intent & webhook Edge Functions, AI assistant proxy (Claude API), notification fan-out |
 
@@ -40,17 +40,36 @@ open PRVBeauty.xcodeproj   # select the PRVBeauty scheme, ⌘R
 
 The app launches in **demo mode** out of the box: every repository is backed by a fully
 functional in-memory backend (`InMemoryBackend`) seeded with realistic data, so every
-screen, flow, and preview works with zero configuration.
+screen, flow, and preview works with zero configuration. It starts signed out, so the
+welcome screen and guest browsing are reachable — see [Demo personas](#demo-personas) to
+launch straight into a client or salon-owner session.
+
+### Pointing at a real backend
+
+```bash
+cp Config/Secrets.example.xcconfig Config/Secrets.xcconfig
+# fill in PRV_SUPABASE_URL and PRV_SUPABASE_ANON_KEY
+xcodegen generate
+```
+
+`AppComposition` reads those values at launch and wires the Supabase-backed repositories,
+a Keychain-persisted session, offline sync, and server-settled payments. With them blank
+it composes the demo backend instead — both are real code paths, and nothing downstream
+can tell which is in play. `Config/Secrets.xcconfig` is git-ignored; the committed
+`Config/Base.xcconfig` includes it only if it exists, so a fresh clone still builds.
 
 ### Running the tests
 
 ```bash
-# Domain logic — no Xcode or simulator needed, runs in seconds on Linux or macOS.
-# Covers the models, booking/pricing/loyalty engines, repository contracts,
-# and the in-memory backend.
+# Domain, wire format, and the live repository layer — no Xcode or simulator
+# needed. 363 tests in seconds on Linux or macOS.
 Scripts/linux-domain-tests.sh
 
-# Everything, including the UI modules:
+# The backend: applies every migration to a throwaway PostgreSQL instance and
+# asserts RLS coverage, booking-overlap rejection, and tenant isolation.
+Scripts/backend-tests.sh
+
+# Everything, including the UI modules and XCUITest suite:
 xcodebuild test -scheme PRVBeauty -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
