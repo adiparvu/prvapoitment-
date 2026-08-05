@@ -42,14 +42,14 @@ final class LaunchPerformanceTests: XCTestCase {
             // The signed-out persona is the true cold-launch path: no session
             // to restore, and the welcome surface is what a first-time user
             // waits for.
-            app.launchArguments = ["-PRVDemoPersona", PRVDemoPersona.signedOut.rawValue]
+            app.launchArguments = PRVDemoPersona.signedOut.launchArguments
             app.launch()
         }
     }
 
     func testWelcomeScreenIsInteractiveWithinTheBudget() {
         let app = XCUIApplication()
-        app.launchArguments = ["-PRVDemoPersona", PRVDemoPersona.signedOut.rawValue]
+        app.launchArguments = PRVDemoPersona.signedOut.launchArguments
 
         let started = Date.now
         app.launch()
@@ -81,7 +81,7 @@ final class LaunchPerformanceTests: XCTestCase {
 
         measure(metrics: [XCTApplicationLaunchMetric()], options: options) {
             let app = XCUIApplication()
-            app.launchArguments = ["-PRVDemoPersona", PRVDemoPersona.client.rawValue]
+            app.launchArguments = PRVDemoPersona.client.launchArguments
             app.launch()
         }
     }

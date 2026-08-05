@@ -4,8 +4,9 @@ import XCTest
 // Shared machinery for the end-to-end suites.
 //
 // Every test drives the shipping app against its demo (in-memory) backend,
-// launched with the `-PRVDemoPersona` argument `App/Sources/PRVBeautyApp.swift`
-// already reads through `UserDefaults`. Nothing here reaches the network, and
+// launched with the `-PRVBackend` and `-PRVDemoPersona` arguments
+// `App/Sources/AppComposition.swift` and `App/Sources/PRVBeautyApp.swift`
+// already read through `UserDefaults`. Nothing here reaches the network, and
 // nothing here imports a feature module: these are black-box tests of the
 // product, addressed the way an assistive technology addresses it.
 
@@ -21,6 +22,19 @@ enum PRVDemoPersona: String {
     case client
     /// The salon owner, opening the business tab bar.
     case owner
+
+    /// Every launch argument a demo run of this persona needs.
+    ///
+    /// `-PRVBackend demo` is not optional. `AppComposition` composes the live
+    /// Supabase backend whenever the build carries credentials, and
+    /// `PRVBeautyApp` only honours a persona on the in-memory backend — so on
+    /// a checkout that has `Config/Secrets.xcconfig`, a launch without this
+    /// argument runs the suite against a real project where none of the demo
+    /// fixtures ("Maison Lumière", "Cut & Blow-Dry", the Gold tier) exist.
+    /// The value must stay in step with `AppComposition.Backend.demo`.
+    var launchArguments: [String] {
+        ["-PRVBackend", "demo", "-PRVDemoPersona", rawValue]
+    }
 }
 
 /// How to find one element: by accessibility identifier first, by visible
@@ -149,7 +163,7 @@ class PRVUITestCase: XCTestCase {
         as persona: PRVDemoPersona,
         extraArguments: [String] = []
     ) -> XCUIApplication {
-        app.launchArguments += ["-PRVDemoPersona", persona.rawValue]
+        app.launchArguments += persona.launchArguments
         app.launchArguments += extraArguments
         app.launch()
         XCTAssertTrue(
@@ -189,6 +203,43 @@ class PRVUITestCase: XCTestCase {
     /// The first element whose label contains `text`.
     func element(_ query: XCUIElementQuery, labelled text: String) -> XCUIElement {
         query.matching(NSPredicate(format: "label CONTAINS[c] %@", text)).firstMatch
+    }
+
+    /// The element that carries `identifier` **and** a label containing `text`.
+    ///
+    /// ``element(_:_:index:)`` treats a locator's label as a *fallback* for
+    /// screens that carry no identifiers yet, so it never narrows a set of
+    /// identifier matches — it hands back `boundBy: index`. Two situations need
+    /// the label to do the choosing instead, and both are load-bearing:
+    ///
+    /// * Repeated rows that share one identifier, e.g. every service in the
+    ///   booking menu is `booking.serviceRow`; only the label says which
+    ///   treatment a row is.
+    /// * A control whose label flips while its identifier stays put, e.g. the
+    ///   daily-reward button. Asserting on the identifier alone re-asserts that
+    ///   the button exists and passes whether or not the state changed.
+    ///
+    /// The returned element is an unresolved query, so a subsequent
+    /// ``expect(_:_:timeout:file:line:)`` keeps re-evaluating it until the
+    /// label appears rather than snapshotting the pre-tap hierarchy.
+    func element(
+        _ query: XCUIElementQuery,
+        identified identifier: String,
+        labelled text: String
+    ) -> XCUIElement {
+        query
+            .matching(identifier: identifier)
+            .matching(NSPredicate(format: "label CONTAINS[c] %@", text))
+            .firstMatch
+    }
+
+    /// The element of unknown type carrying `identifier` and a label containing
+    /// `text`.
+    ///
+    /// The any-type counterpart of ``element(_:identified:labelled:)``, for the
+    /// combined elements ``anyElement(_:)`` exists to reach.
+    func anyElement(identified identifier: String, labelled text: String) -> XCUIElement {
+        element(app.descendants(matching: .any), identified: identifier, labelled: text)
     }
 
     /// Resolves an element of unknown type.

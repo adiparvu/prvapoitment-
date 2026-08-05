@@ -99,10 +99,12 @@ final class BusinessExperienceUITests: PRVUITestCase {
             """
         )
 
-        // Confirmed → Checked In.
+        // Confirmed → Checked In. The pill keeps one identifier through the
+        // whole flow, so each step is asserted on the wording it lands on —
+        // matching the identifier alone would pass on any status at all.
         tap(firstAction, "the Check in action")
         expect(
-            anyElement(PRVLocator(PRVElement.dashboardStatusPill.identifier, label: "Checked In")),
+            anyElement(identified: PRVElement.dashboardStatusPill.identifier, labelled: "Checked In"),
             "the Checked In status"
         )
 
@@ -112,7 +114,7 @@ final class BusinessExperienceUITests: PRVUITestCase {
             "the Start action"
         )
         expect(
-            anyElement(PRVLocator(PRVElement.dashboardStatusPill.identifier, label: "In Progress")),
+            anyElement(identified: PRVElement.dashboardStatusPill.identifier, labelled: "In Progress"),
             "the In Progress status"
         )
 
@@ -123,7 +125,7 @@ final class BusinessExperienceUITests: PRVUITestCase {
             "the Complete action"
         )
         expect(
-            anyElement(PRVLocator(PRVElement.dashboardStatusPill.identifier, label: "Completed")),
+            anyElement(identified: PRVElement.dashboardStatusPill.identifier, labelled: "Completed"),
             "the Completed status"
         )
         XCTAssertEqual(

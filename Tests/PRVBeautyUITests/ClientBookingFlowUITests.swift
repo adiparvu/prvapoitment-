@@ -123,8 +123,17 @@ final class ClientBookingFlowUITests: PRVUITestCase {
     }
 
     /// A service row in the booking flow's first step.
+    ///
+    /// Every row carries the same identifier, so the treatment's name is what
+    /// picks one out — the demo salon publishes two hair services and the menu
+    /// is alphabetized, which would otherwise hand back Balayage & Gloss and
+    /// quietly *add* a second treatment instead of removing this one.
     private func serviceRow() -> XCUIElement {
-        element(app.buttons, PRVLocator(PRVElement.bookingServiceRow.identifier, label: treatment))
+        element(
+            app.buttons,
+            identified: PRVElement.bookingServiceRow.identifier,
+            labelled: treatment
+        )
     }
 
     /// Moves the date strip to tomorrow.

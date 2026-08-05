@@ -318,7 +318,7 @@ extension ApplePayCoordinator {
         paymentRequest.merchantIdentifier = merchantIdentifier
         paymentRequest.countryCode = request.countryCode
         paymentRequest.currencyCode = request.total.currency.rawValue
-        paymentRequest.merchantCapabilities = [.threeDSecure, .credit, .debit]
+        paymentRequest.merchantCapabilities = [.capability3DS, .capabilityCredit, .capabilityDebit]
         paymentRequest.supportedNetworks = supportedNetworks
         // The postcode is the only contact field PRV asks for, and only because
         // the acquirer runs address verification on it.

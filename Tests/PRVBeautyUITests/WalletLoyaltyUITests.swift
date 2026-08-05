@@ -71,9 +71,12 @@ final class WalletLoyaltyUITests: PRVUITestCase {
         tap(claim, "the daily reward button")
 
         // The backend is idempotent per day, and the UI has to say so rather
-        // than offering a second claim that quietly does nothing.
+        // than offering a second claim that quietly does nothing. The button
+        // keeps its identifier and flips its label, so the label is what has to
+        // be waited on — matching the identifier alone would only re-assert
+        // that the button is still on screen.
         expect(
-            element(app.buttons, PRVLocator("loyalty.claimDaily", label: "Already claimed today")),
+            element(app.buttons, identified: "loyalty.claimDaily", labelled: "Already claimed today"),
             "the claimed state"
         )
     }
